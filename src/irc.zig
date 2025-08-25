@@ -5,6 +5,7 @@ pub const IrcConfig = struct {
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
+    comptime std.debug.assert(std.mem.byte_size_in_bits == 8);
     return struct {
         const Self = @This();
         const ref_count_size = @max(@sizeOf(cfg.counter), @alignOf(T));
