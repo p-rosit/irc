@@ -108,6 +108,7 @@ const TestType = struct { v1: u8, v2: u8, v3: u8 };
 test "just make type" {
     _ = IrcSlice(u128, .{});
     _ = IrcSlice(TestType, .{});
+    comptime std.debug.assert(@alignOf(TestType) < @sizeOf(TestType));
 }
 
 test "init and deinit" {
