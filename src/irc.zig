@@ -30,7 +30,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
                 Self.alignment,
                 total_size,
             );
-            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(cfg.Counter) - Self.alignment);
+            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - Self.alignment);
 
             const self: Self = .{
                 .items = bytesAsSliceCast(T, b[Self.alignment..]),
