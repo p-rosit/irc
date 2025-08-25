@@ -40,7 +40,21 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+            std.debug.assert(self.dangling());
             allocator.free(self.bytes());
+        }
+
+        pub fn dangling(self: Self) bool {
+            return self.refCountPtr().* == 0;
+        }
+
+        pub fn retain(self: Self) !void {
+            self.refCountPtr().* = try std.math.add(cfg.counter, self.refCountPtr().*, 1);
+        }
+
+        pub fn release(self: Self) void {
+            std.debug.assert(self.refCountPtr().* > 0);
+            self.refCountPtr().* -= 1;
         }
 
         // This function from `std.mem` has been duplicated since we need
@@ -106,4 +120,60 @@ test "init and deinit empty" {
 
     const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
+}
+
+test "release and retain" {
+    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 5);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    try a.retain();
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    try std.testing.expect(!a.dangling());
+
+    a.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 5);
+    defer b.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, b.refCountPtr().*);
+    try std.testing.expect(b.dangling());
+
+    try b.retain();
+    try std.testing.expectEqual(1, b.refCountPtr().*);
+    try std.testing.expect(!b.dangling());
+
+    b.release();
+    try std.testing.expectEqual(0, b.refCountPtr().*);
+    try std.testing.expect(b.dangling());
+}
+
+test "release and retain empty" {
+    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    try a.retain();
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    try std.testing.expect(!a.dangling());
+
+    a.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 0);
+    defer b.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, b.refCountPtr().*);
+    try std.testing.expect(b.dangling());
+
+    try b.retain();
+    try std.testing.expectEqual(1, b.refCountPtr().*);
+    try std.testing.expect(!b.dangling());
+
+    b.release();
+    try std.testing.expectEqual(0, b.refCountPtr().*);
+    try std.testing.expect(b.dangling());
 }
