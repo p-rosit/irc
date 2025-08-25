@@ -1,15 +1,15 @@
 const std = @import("std");
 
 pub const IrcConfig = struct {
-    counter: type = usize,
+    Counter: type = usize,
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     comptime std.debug.assert(std.mem.byte_size_in_bits == 8);
     return struct {
         const Self = @This();
-        const ref_count_size = @max(@sizeOf(cfg.counter), @alignOf(T));
-        const alignment = @max(@alignOf(cfg.counter), @alignOf(T));
+        const ref_count_size = @max(@sizeOf(cfg.Counter), @alignOf(T));
+        const alignment = @max(@alignOf(cfg.Counter), @alignOf(T));
 
         items: []T,
 
@@ -30,7 +30,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
                 Self.alignment,
                 total_size,
             );
-            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(cfg.counter) - Self.alignment);
+            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(cfg.Counter) - Self.alignment);
 
             const self: Self = .{
                 .items = bytesAsSliceCast(T, b[Self.alignment..]),
@@ -50,7 +50,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         pub fn retain(self: Self) !void {
-            self.refCountPtr().* = try std.math.add(cfg.counter, self.refCountPtr().*, 1);
+            self.refCountPtr().* = try std.math.add(cfg.Counter, self.refCountPtr().*, 1);
         }
 
         pub fn release(self: Self) void {
@@ -78,8 +78,8 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             ).*;
         }
 
-        fn refCountPtr(self: Self) *cfg.counter {
-            return std.mem.bytesAsValue(cfg.counter, self.bytes()[0..@sizeOf(cfg.counter)]);
+        fn refCountPtr(self: Self) *cfg.Counter {
+            return std.mem.bytesAsValue(cfg.Counter, self.bytes()[0..@sizeOf(cfg.Counter)]);
         }
     };
 }
