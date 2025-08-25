@@ -5,14 +5,14 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const mod = b.addModule("irc", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/irc.zig"),
         .target = target,
         .optimize = optimize,
     });
     _ = mod;
 
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/irc.zig"),
         .target = target,
         .optimize = optimize,
     });
