@@ -34,6 +34,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             const self: Self = .{
                 .items = bytesAsSliceCast(T, b[Self.alignment..]),
             };
+            self.refCountPtr().* = 0;
 
             return self;
         }
@@ -60,6 +61,10 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
                     .len = Self.ref_count_size + self.items.len * @sizeOf(T),
                 }))),
             ).*;
+        }
+
+        fn refCountPtr(self: Self) *cfg.counter {
+            return std.mem.bytesAsValue(cfg.counter, self.bytes()[0..@sizeOf(cfg.counter)]);
         }
     };
 }
