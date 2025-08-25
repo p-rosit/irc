@@ -103,16 +103,18 @@ fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) 
     });
 }
 
+const TestType = struct { v1: u8, v2: u8, v3: u8 };
+
 test "just make type" {
     _ = IrcSlice(u128, .{});
-    _ = IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{});
+    _ = IrcSlice(TestType, .{});
 }
 
 test "init and deinit" {
     const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 7);
     defer a.deinit(std.testing.allocator);
 
-    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 7);
+    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 7);
     defer b.deinit(std.testing.allocator);
 }
 
@@ -120,7 +122,7 @@ test "init and deinit empty" {
     const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
 
-    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 0);
+    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 }
 
@@ -138,7 +140,7 @@ test "release and retain" {
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
-    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 5);
+    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 5);
     defer b.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
@@ -166,7 +168,7 @@ test "release and retain empty" {
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
-    const b = try IrcSlice(struct { v1: u8, v2: u8, v3: u8 }, .{}).init(std.testing.allocator, 0);
+    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
@@ -196,9 +198,8 @@ test "alignment" {
 
     try comptime std.testing.expectEqual([]align(64) u128, @TypeOf(a.items));
 
-    const S = struct { v1: u8, v2: u8, v3: u8 };
-    const b = try IrcSlice(S, .{ .alignment = 32 }).init(std.testing.allocator, 0);
+    const b = try IrcSlice(TestType, .{ .alignment = 32 }).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 
-    try comptime std.testing.expectEqual([]align(32) S, @TypeOf(b.items));
+    try comptime std.testing.expectEqual([]align(32) TestType, @TypeOf(b.items));
 }
