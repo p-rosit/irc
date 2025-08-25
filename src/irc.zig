@@ -2,16 +2,17 @@ const std = @import("std");
 
 pub const IrcConfig = struct {
     Counter: type = usize,
+    alignment: ?usize = null,
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     comptime std.debug.assert(std.mem.byte_size_in_bits == 8);
     return struct {
         const Self = @This();
-        const ref_count_size = @as(usize, @max(@sizeOf(cfg.Counter), @alignOf(T)));
-        const alignment = @as(usize, @max(@alignOf(cfg.Counter), @alignOf(T)));
+        const ref_count_size = @as(usize, @max(@sizeOf(cfg.Counter), cfg.alignment orelse @alignOf(T)));
+        const alignment = @as(usize, @max(@alignOf(cfg.Counter), cfg.alignment orelse @alignOf(T)));
 
-        items: []T,
+        items: []align(cfg.alignment orelse @alignOf(T)) T,
 
         pub fn init(allocator: std.mem.Allocator, size: usize) !Self {
             const slice_size = std.math.mul(
@@ -187,4 +188,17 @@ test "retain overflow" {
     defer a.refCountPtr().* = 0;
 
     try std.testing.expectError(error.Overflow, a.retain());
+}
+
+test "alignment" {
+    const a = try IrcSlice(u128, .{ .alignment = 64 }).init(std.testing.allocator, 0);
+    defer a.deinit(std.testing.allocator);
+
+    try comptime std.testing.expectEqual([]align(64) u128, @TypeOf(a.items));
+
+    const S = struct { v1: u8, v2: u8, v3: u8 };
+    const b = try IrcSlice(S, .{ .alignment = 32 }).init(std.testing.allocator, 0);
+    defer b.deinit(std.testing.allocator);
+
+    try comptime std.testing.expectEqual([]align(32) S, @TypeOf(b.items));
 }
