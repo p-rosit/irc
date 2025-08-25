@@ -127,6 +127,29 @@ test "init and deinit empty" {
     defer b.deinit(std.testing.allocator);
 }
 
+test "allocation failure" {
+    var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    const err = IrcSlice(u8, .{}).init(failing_allocator.allocator(), 3);
+    try std.testing.expectError(error.OutOfMemory, err);
+}
+
+test "only one allocation" {
+    var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 1 });
+    const a = try IrcSlice(u8, .{}).init(failing_allocator.allocator(), 3);
+    a.deinit(std.testing.allocator);
+}
+
+test "slice size multiplication too big" {
+    const err = IrcSlice(struct { v1: u8, v2: u8 }, .{}).init(std.testing.allocator, std.math.maxInt(usize) / 2 + 1);
+    try std.testing.expectError(error.OutOfMemory, err);
+}
+
+test "slice cannot also fit reference count" {
+    comptime std.debug.assert(@sizeOf(usize) > @sizeOf(u8));
+    const err = IrcSlice(u8, .{}).init(std.testing.allocator, std.math.maxInt(usize) - 1);
+    try std.testing.expectError(error.OutOfMemory, err);
+}
+
 test "release and retain" {
     const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 5);
     defer a.deinit(std.testing.allocator);
