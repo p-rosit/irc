@@ -178,3 +178,13 @@ test "release and retain empty" {
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
 }
+
+test "retain overflow" {
+    const a = try IrcSlice(u128, .{ .Counter = usize }).init(std.testing.allocator, 0);
+    defer a.deinit(std.testing.allocator);
+
+    a.refCountPtr().* = std.math.maxInt(usize);
+    defer a.refCountPtr().* = 0;
+
+    try std.testing.expectError(error.Overflow, a.retain());
+}
