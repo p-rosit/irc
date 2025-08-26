@@ -99,14 +99,10 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         fn bytes(self: Self) []align(alignment) u8 {
-            const val = @intFromPtr(self.items.ptr) - alignment;
             return @as(
-                *[]align(alignment) u8,
-                @alignCast(@ptrCast(@constCast(&.{
-                    .ptr = @as([*]u8, @ptrFromInt(val)),
-                    .len = ref_count_size + self.items.len * @sizeOf(T),
-                }))),
-            ).*;
+                [*]align(alignment) u8,
+                @ptrFromInt(@intFromPtr(self.items.ptr) - alignment),
+            )[0 .. ref_count_size + self.items.len * @sizeOf(T)];
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
