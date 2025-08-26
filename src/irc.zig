@@ -29,6 +29,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
 
     return struct {
         const Self = @This();
+        const config = cfg;
 
         items: []align(cfg.alignment orelse @alignOf(T)) T,
 
@@ -86,6 +87,9 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
 
         pub fn cast(self: Self, IrcType: type) IrcType {
             comptime Self.isIrcType(IrcType);
+            if (cfg.Counter != IrcType.config.Counter) {
+                @compileError(std.fmt.comptimePrint("Cannot cast to slice with different reference counter type, source counter is {} and target counter is {}", .{ cfg.Counter, IrcType.config.Counter }));
+            }
             return .{ .items = @ptrCast(self.items) };
         }
 
