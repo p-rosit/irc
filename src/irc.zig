@@ -229,10 +229,12 @@ test "alignment" {
     const a = try IrcSlice(u128, .{ .alignment = 64 }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
 
-    try comptime std.testing.expectEqual([]align(64) u128, @TypeOf(a.items));
+    try std.testing.expect(64 != @alignOf(u128));
+    try std.testing.expectEqual([]align(64) u128, @TypeOf(a.items));
 
     const b = try IrcSlice(TestType, .{ .alignment = 32 }).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 
-    try comptime std.testing.expectEqual([]align(32) TestType, @TypeOf(b.items));
+    try std.testing.expect(32 != @alignOf(TestType));
+    try std.testing.expectEqual([]align(32) TestType, @TypeOf(b.items));
 }
