@@ -7,11 +7,17 @@ pub const IrcConfig = struct {
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     comptime try std.testing.expectEqual(8, std.mem.byte_size_in_bits);
+    const ref_count_size = @as(usize, @max(
+        @sizeOf(cfg.Counter),
+        cfg.alignment orelse @alignOf(T),
+    ));
+    const alignment = @as(usize, @max(
+        @alignOf(cfg.Counter),
+        cfg.alignment orelse @alignOf(T),
+    ));
 
     return struct {
         const Self = @This();
-        const ref_count_size = @as(usize, @max(@sizeOf(cfg.Counter), cfg.alignment orelse @alignOf(T)));
-        const alignment = @as(usize, @max(@alignOf(cfg.Counter), cfg.alignment orelse @alignOf(T)));
 
         items: []align(cfg.alignment orelse @alignOf(T)) T,
 
@@ -23,19 +29,19 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             ) catch return error.OutOfMemory;
             const total_size = std.math.add(
                 usize,
-                Self.ref_count_size,
+                ref_count_size,
                 slice_size,
             ) catch return error.OutOfMemory;
 
             const b = try allocator.alignedAlloc(
                 u8,
-                Self.alignment,
+                alignment,
                 total_size,
             );
-            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - Self.alignment);
+            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
 
             const self: Self = .{
-                .items = bytesAsSliceCast(T, b[Self.alignment..]),
+                .items = bytesAsSliceCast(T, b[alignment..]),
             };
             self.refCountPtr().* = 0;
 
@@ -76,20 +82,20 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             return @as(cast_target, @ptrCast(bytes_slice))[0..@divExact(bytes_slice.len, @sizeOf(S))];
         }
 
-        fn bytes(self: Self) []align(Self.alignment) u8 {
-            const val = @intFromPtr(self.items.ptr) - Self.alignment;
+        fn bytes(self: Self) []align(alignment) u8 {
+            const val = @intFromPtr(self.items.ptr) - alignment;
             return @as(
-                *[]align(Self.alignment) u8,
+                *[]align(alignment) u8,
                 @alignCast(@ptrCast(@constCast(&.{
                     .ptr = @as([*]u8, @ptrFromInt(val)),
-                    .len = Self.ref_count_size + self.items.len * @sizeOf(T),
+                    .len = ref_count_size + self.items.len * @sizeOf(T),
                 }))),
             ).*;
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
-            const end = Self.ref_count_size;
-            const start = end - @sizeOf(usize);
+            const end = ref_count_size;
+            const start = end - @sizeOf(cfg.Counter);
             return std.mem.bytesAsValue(cfg.Counter, self.bytes()[start..end]);
         }
     };
