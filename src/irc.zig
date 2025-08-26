@@ -42,6 +42,13 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             return self;
         }
 
+        pub fn releaseDeinit(self: Self, allocator: std.mem.Allocator) void {
+            self.release();
+            if (self.dangling()) {
+                self.deinit(allocator);
+            }
+        }
+
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
             std.debug.assert(self.dangling());
             allocator.free(self.bytes());
@@ -126,6 +133,15 @@ test "init and deinit empty" {
 
     const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
+}
+
+test "deinit and maybe release" {
+    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
+
+    try a.retain();
+    try a.retain();
+    a.releaseDeinit(std.testing.allocator);
+    a.releaseDeinit(std.testing.allocator);
 }
 
 test "allocation failure" {
