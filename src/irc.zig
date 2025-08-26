@@ -230,27 +230,33 @@ test "slice cannot also fit reference count" {
 test "release and retain" {
     const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 5);
     defer a.deinit(std.testing.allocator);
+    @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
     try a.retain();
+    @memset(a.items, 0);
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
     a.release();
+    @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
     const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 5);
     defer b.deinit(std.testing.allocator);
+    @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
 
     try b.retain();
+    @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(1, b.refCountPtr().*);
     try std.testing.expect(!b.dangling());
 
     b.release();
+    @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
 }
