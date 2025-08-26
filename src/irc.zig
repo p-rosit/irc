@@ -19,11 +19,11 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     switch (@typeInfo(cfg.Counter)) {
         .Int => |int| {
             if (int.signedness != .unsigned) {
-                @compileError("Reference counter type must be unsigned");
+                @compileError(std.fmt.comptimePrint("Reference counter type must be unsigned, got {}", .{cfg.Counter}));
             }
         },
         else => {
-            @compileError("Reference counter type must be an unsigned integer");
+            @compileError(std.fmt.comptimePrint("Reference counter type must be an unsigned integer, got {}", .{cfg.Counter}));
         },
     }
 
