@@ -215,6 +215,14 @@ test "retain overflow" {
     defer a.refCountPtr().* = 0;
 
     try std.testing.expectError(error.Overflow, a.retain());
+
+    const b = try IrcSlice(u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
+    defer b.deinit(std.testing.allocator);
+
+    b.refCountPtr().* = std.math.maxInt(u8);
+    defer b.refCountPtr().* = 0;
+
+    try std.testing.expectError(error.Overflow, b.retain());
 }
 
 test "alignment" {
