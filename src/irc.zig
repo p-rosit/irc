@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const IrcConfig = struct {
     Counter: type = usize,
-    alignment: ?usize = null,
+    alignment: ?u16 = null,
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
