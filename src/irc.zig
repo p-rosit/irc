@@ -84,6 +84,11 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             self.refCountPtr().* -= 1;
         }
 
+        pub fn cast(self: Self, IrcType: type) IrcType {
+            comptime Self.isIrcType(IrcType);
+            return .{ .items = @ptrCast(self.items) };
+        }
+
         // This function from `std.mem` has been duplicated since we need
         // to be able to give it slices of length 0 which still contain
         // a valid pointer. Currently there's a special case for empty
@@ -108,6 +113,42 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             const end = ref_count_size;
             const start = end - @sizeOf(cfg.Counter);
             return std.mem.bytesAsValue(cfg.Counter, self.bytes()[start..end]);
+        }
+
+        fn isIrcType(IrcType: type) void {
+            const irc_info = @typeInfo(IrcType);
+            switch (irc_info) {
+                .Struct => {},
+                else => {
+                    @compileError("Not an Irc type, expected a struct");
+                },
+            }
+
+            var found: bool = false;
+            const field_items = "items";
+            comptime for (irc_info.Struct.fields) |field| {
+                found = found or std.mem.eql(u8, field_items, field.name);
+            };
+            if (!found) {
+                @compileError("Not an Irc type, expected field named 'items'");
+            }
+
+            const methods = [_][]const u8{
+                "init",
+                "deinit",
+                "releaseDeinit",
+                "dangling",
+                "retain",
+                "release",
+                "cast",
+            };
+            comptime for (methods) |method| {
+                if (!std.meta.hasFn(IrcType, method)) {
+                    @compileError("Not an Irc type, missing method '" ++ method ++ "'");
+                }
+            };
+
+            // Type passes sanity checks...
         }
     };
 }
@@ -272,4 +313,18 @@ test "alignment" {
 
     try std.testing.expect(32 != @alignOf(TestType));
     try std.testing.expectEqual([]align(32) TestType, @TypeOf(b.items));
+}
+
+test "cast" {
+    const a = try IrcSlice(u128, .{ .alignment = 64 }).init(std.testing.allocator, 10);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expect(64 != @alignOf(u128));
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+
+    const b = a.cast(IrcSlice(u128, .{}));
+    try b.retain();
+
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    b.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
 }
