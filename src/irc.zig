@@ -16,6 +16,17 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         cfg.alignment orelse @alignOf(T),
     ));
 
+    switch (@typeInfo(cfg.Counter)) {
+        .Int => |int| {
+            if (int.signedness != .unsigned) {
+                @compileError("Reference counter type must be unsigned");
+            }
+        },
+        else => {
+            @compileError("Reference counter type must be an unsigned integer");
+        },
+    }
+
     return struct {
         const Self = @This();
 
