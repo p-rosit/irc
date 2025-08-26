@@ -106,9 +106,8 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
-            const end = ref_count_size;
-            const start = end - @sizeOf(cfg.Counter);
-            return std.mem.bytesAsValue(cfg.Counter, self.bytes()[start..end]);
+            const val = @intFromPtr(self.items.ptr) - @sizeOf(usize);
+            return @ptrFromInt(val);
         }
 
         fn isIrcType(IrcType: type) void {
