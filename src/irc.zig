@@ -184,7 +184,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn cast(self: Self, IrcType: type) IrcType {
-            comptime Self.isIrcType(IrcType);
+            comptime isIrcType(IrcType);
             if (cfg.Counter != IrcType.config.Counter) {
                 @compileError(std.fmt.comptimePrint(
                     \\Cannot cast to slice with different reference counter type,
@@ -233,43 +233,43 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             };
             return @ptrFromInt(@intFromPtr(ptr) - alignment_offset);
         }
+    };
+}
 
-        fn isIrcType(IrcType: type) void {
-            const irc_info = @typeInfo(IrcType);
-            switch (irc_info) {
-                .Struct => {},
-                else => {
-                    @compileError("Not an Irc type, expected a struct");
-                },
-            }
+pub fn isIrcType(IrcType: type) void {
+    const irc_info = @typeInfo(IrcType);
+    switch (irc_info) {
+        .Struct => {},
+        else => {
+            @compileError("Not an Irc type, expected a struct");
+        },
+    }
 
-            var found: bool = false;
-            const field_items = "items";
-            comptime for (irc_info.Struct.fields) |field| {
-                found = found or std.mem.eql(u8, field_items, field.name);
-            };
-            if (!found) {
-                @compileError("Not an Irc type, expected field named 'items'");
-            }
+    var found: bool = false;
+    const field_items = "items";
+    comptime for (irc_info.Struct.fields) |field| {
+        found = found or std.mem.eql(u8, field_items, field.name);
+    };
+    if (!found) {
+        @compileError("Not an Irc type, expected field named 'items'");
+    }
 
-            const methods = [_][]const u8{
-                // "init", // The usingnamespace shenanigans makes zig not think `init` is a method
-                "deinit",
-                "releaseDeinitDangling",
-                "dangling",
-                "retain",
-                "release",
-                "cast",
-            };
-            comptime for (methods) |method| {
-                if (!std.meta.hasFn(IrcType, method)) {
-                    @compileError("Not an Irc type, missing method '" ++ method ++ "'");
-                }
-            };
-
-            // Type passes sanity checks...
+    const methods = [_][]const u8{
+        // "init", // The usingnamespace shenanigans makes zig not think `init` is a method
+        "deinit",
+        "releaseDeinitDangling",
+        "dangling",
+        "retain",
+        "release",
+        "cast",
+    };
+    comptime for (methods) |method| {
+        if (!std.meta.hasFn(IrcType, method)) {
+            @compileError("Not an Irc type, missing method '" ++ method ++ "'");
         }
     };
+
+    // Type passes sanity checks...
 }
 
 fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfig) type {
