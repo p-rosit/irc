@@ -184,6 +184,18 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn cast(self: Self, IrcType: type) IrcType {
+            return self.anyCast(IrcType, false, false);
+        }
+
+        pub fn alignCast(self: Self, IrcType: type) IrcType {
+            return self.anyCast(IrcType, false, true);
+        }
+
+        pub fn constCast(self: Self, IrcType: type) IrcType {
+            return self.anyCast(IrcType, true, false);
+        }
+
+        fn anyCast(self: Self, IrcType: type, comptime const_cast: bool, comptime align_cast: bool) IrcType {
             comptime if (isIrcSanityCheck(IrcType)) |err| {
                 @compileError("Cannot cast to non-Irc type: " ++ err);
             };
@@ -195,7 +207,15 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                     .{ cfg.Counter, IrcType.config.Counter },
                 ));
             }
-            return .{ .items = @ptrCast(self.items) };
+            if (const_cast and align_cast) {
+                return .{ .items = @ptrCast(@alignCast(@constCast(self.items))) };
+            } else if (const_cast) {
+                return .{ .items = @ptrCast(@constCast(self.items)) };
+            } else if (align_cast) {
+                return .{ .items = @ptrCast(@alignCast(self.items)) };
+            } else {
+                return .{ .items = @ptrCast(self.items) };
+            }
         }
 
         fn bytes(self: Self) []align(alignment) u8 {
@@ -654,4 +674,36 @@ test "one cast" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     b.release();
     try std.testing.expectEqual(0, a.refCountPtr().*);
+}
+
+test "slice align cast" {
+    const a = try Irc(.Slice, u128, .{ .alignment = 64 }).init(std.testing.allocator, 10);
+    defer a.deinit(std.testing.allocator);
+
+    const b = a.cast(Irc(.Slice, u128, .{ .alignment = 32 }));
+    _ = b.alignCast(Irc(.Slice, u128, .{ .alignment = 64 }));
+}
+
+test "one align cast" {
+    const a = try Irc(.One, u128, .{ .alignment = 64 }).init(std.testing.allocator);
+    defer a.deinit(std.testing.allocator);
+
+    const b = a.cast(Irc(.One, u128, .{ .alignment = 32 }));
+    _ = b.alignCast(Irc(.One, u128, .{ .alignment = 64 }));
+}
+
+test "slice const cast" {
+    const a = try Irc(.Slice, u128, .{ .is_const = false }).init(std.testing.allocator, 10);
+    defer a.deinit(std.testing.allocator);
+
+    const b = a.cast(Irc(.Slice, u128, .{ .is_const = true }));
+    _ = b.constCast(Irc(.Slice, u128, .{ .is_const = false }));
+}
+
+test "one const cast" {
+    const a = try Irc(.One, u128, .{ .is_const = false }).init(std.testing.allocator);
+    defer a.deinit(std.testing.allocator);
+
+    const b = a.cast(Irc(.One, u128, .{ .is_const = true }));
+    _ = b.constCast(Irc(.One, u128, .{ .is_const = false }));
 }
