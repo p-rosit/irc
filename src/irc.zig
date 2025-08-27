@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const IrcConfig = struct {
     Counter: type = usize,
@@ -7,14 +8,6 @@ pub const IrcConfig = struct {
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     comptime try std.testing.expectEqual(8, std.mem.byte_size_in_bits);
-    const ref_count_size = @as(usize, @max(
-        @sizeOf(cfg.Counter),
-        cfg.alignment orelse @alignOf(T),
-    ));
-    const alignment = @as(usize, @max(
-        @alignOf(cfg.Counter),
-        cfg.alignment orelse @alignOf(T),
-    ));
 
     switch (@typeInfo(cfg.Counter)) {
         .Int => |int| {
@@ -33,6 +26,51 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         },
     }
 
+    const alignment = if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) block: {
+        // include alignment of alignment information
+        break :block @as(usize, @max(
+            @sizeOf(u16),
+            @alignOf(cfg.Counter),
+            cfg.alignment orelse @alignOf(T),
+        ));
+    } else block: {
+        // don't include alignment of alignment information
+        break :block @as(usize, @max(
+            @alignOf(cfg.Counter),
+            cfg.alignment orelse @alignOf(T),
+        ));
+    };
+
+    var rc_offset: usize = undefined;
+    var al_offset: usize = undefined;
+
+    if (@sizeOf(cfg.Counter) < @sizeOf(u16) and builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+        rc_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
+        al_offset = @sizeOf(u16);
+    } else {
+        rc_offset = @sizeOf(cfg.Counter);
+        al_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
+    }
+
+    const ref_count_offset = rc_offset;
+    const alignment_offset = al_offset;
+
+    const meta_data_size: usize = if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) block: {
+        // include alignment information in allocation
+        break :block alignment * try std.math.divCeil(
+            usize,
+            @max(ref_count_offset, alignment_offset),
+            alignment,
+        );
+    } else block: {
+        // don't allocate alignment information
+        break :block alignment * try std.math.divCeil(
+            usize,
+            ref_count_offset,
+            alignment,
+        );
+    };
+
     return struct {
         const Self = @This();
         const config = cfg;
@@ -47,7 +85,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             ) catch return error.OutOfMemory;
             const total_size = std.math.add(
                 usize,
-                ref_count_size,
+                meta_data_size,
                 slice_size,
             ) catch return error.OutOfMemory;
 
@@ -59,9 +97,12 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
 
             const self: Self = .{
-                .items = bytesAsSliceCast(T, b[alignment..]),
+                .items = bytesAsSliceCast(T, b[meta_data_size..]),
             };
             self.refCountPtr().* = 0;
+            if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+                self.alignmentPtr().* = alignment;
+            }
 
             return self;
         }
@@ -74,6 +115,10 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+            if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+                std.debug.assert(alignment == self.alignmentPtr().*);
+            }
+
             std.debug.assert(self.dangling());
             allocator.free(self.bytes());
         }
@@ -117,11 +162,19 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             return @as(
                 [*]align(alignment) u8,
                 @ptrFromInt(@intFromPtr(self.items.ptr) - alignment),
-            )[0 .. ref_count_size + self.items.len * @sizeOf(T)];
+            )[0 .. meta_data_size + self.items.len * @sizeOf(T)];
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
-            const val = @intFromPtr(self.items.ptr) - @sizeOf(cfg.Counter);
+            const val = @intFromPtr(self.items.ptr) - ref_count_offset;
+            return @ptrFromInt(val);
+        }
+
+        fn alignmentPtr(self: Self) *u16 {
+            if (builtin.mode != .Debug and builtin.mode != .ReleaseSafe) {
+                @compileError("Internal error, alignment is not stored in this optimization mode");
+            }
+            const val = @intFromPtr(self.items.ptr) - alignment_offset;
             return @ptrFromInt(val);
         }
 
