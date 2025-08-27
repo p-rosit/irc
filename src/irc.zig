@@ -5,6 +5,10 @@ pub const IrcConfig = struct {
     Counter: type = usize,
     alignment: ?u16 = null,
     is_const: bool = false,
+    is_volatile: bool = false,
+    is_allowzero: bool = false,
+    address_space: std.builtin.AddressSpace = .generic,
+    sentinel: ?*const anyopaque = null,
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
@@ -222,12 +226,12 @@ fn IrcSliceType(T: type, config: IrcConfig) type {
         .Pointer = .{
             .size = .Slice,
             .is_const = config.is_const,
-            .is_volatile = false,
-            .is_allowzero = false,
+            .is_volatile = config.is_volatile,
+            .is_allowzero = config.is_allowzero,
             .alignment = config.alignment orelse @alignOf(T),
-            .address_space = .generic,
+            .address_space = config.address_space,
             .child = T,
-            .sentinel = null,
+            .sentinel = config.sentinel,
         },
     });
 }
@@ -256,6 +260,23 @@ test "just make type" {
     _ = IrcSlice(u128, .{});
     _ = IrcSlice(TestType, .{});
     comptime try std.testing.expect(@alignOf(TestType) < @sizeOf(TestType));
+}
+
+test "make type with bells and whistles" {
+    const T = IrcSlice(u128, .{
+        .alignment = 32,
+        .is_const = true,
+        .is_volatile = true,
+        .is_allowzero = true,
+        .address_space = .gs,
+        .sentinel = &@as(u128, 1),
+    });
+    const a: T = undefined;
+    try std.testing.expect(32 != @alignOf(u128));
+    try std.testing.expectEqual(
+        [:1]allowzero align(32) addrspace(.gs) const volatile u128,
+        @TypeOf(a.items),
+    );
 }
 
 test "init and deinit" {
