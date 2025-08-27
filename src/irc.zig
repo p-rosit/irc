@@ -184,7 +184,9 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn cast(self: Self, IrcType: type) IrcType {
-            comptime isIrcSanityCheck(IrcType);
+            comptime if (isIrcSanityCheck(IrcType)) |err| {
+                @compileError("Cannot cast to non-Irc type: " ++ err);
+            };
             if (cfg.Counter != IrcType.config.Counter) {
                 @compileError(std.fmt.comptimePrint(
                     \\Cannot cast to slice with different reference counter type,
@@ -236,12 +238,12 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     };
 }
 
-pub fn isIrcSanityCheck(IrcType: type) void {
+pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
     const irc_info = @typeInfo(IrcType);
     switch (irc_info) {
         .Struct => {},
         else => {
-            @compileError("Not an Irc type, expected a struct");
+            return "expected a struct";
         },
     }
 
@@ -251,7 +253,7 @@ pub fn isIrcSanityCheck(IrcType: type) void {
         found = found or std.mem.eql(u8, field_items, field.name);
     };
     if (!found) {
-        @compileError("Not an Irc type, expected field named 'items'");
+        return "expected field named 'items'";
     }
 
     const methods = [_][]const u8{
@@ -265,11 +267,12 @@ pub fn isIrcSanityCheck(IrcType: type) void {
     };
     comptime for (methods) |method| {
         if (!std.meta.hasFn(IrcType, method)) {
-            @compileError("Not an Irc type, missing method '" ++ method ++ "'");
+            return "missing method '" ++ method ++ "'";
         }
     };
 
     // Type passes sanity checks...
+    return null;
 }
 
 fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfig) type {
