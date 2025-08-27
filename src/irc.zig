@@ -184,7 +184,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn cast(self: Self, IrcType: type) IrcType {
-            comptime isIrcType(IrcType);
+            comptime isIrcSanityCheck(IrcType);
             if (cfg.Counter != IrcType.config.Counter) {
                 @compileError(std.fmt.comptimePrint(
                     \\Cannot cast to slice with different reference counter type,
@@ -236,7 +236,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     };
 }
 
-pub fn isIrcType(IrcType: type) void {
+pub fn isIrcSanityCheck(IrcType: type) void {
     const irc_info = @typeInfo(IrcType);
     switch (irc_info) {
         .Struct => {},
