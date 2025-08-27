@@ -85,35 +85,68 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 
         items: IrcPointerType(size, T, cfg),
 
-        pub fn init(allocator: std.mem.Allocator, length: usize) !Self {
-            const slice_size = std.math.mul(
-                usize,
-                length,
-                @sizeOf(T),
-            ) catch return error.OutOfMemory;
-            const total_size = std.math.add(
-                usize,
-                meta_data_size,
-                slice_size,
-            ) catch return error.OutOfMemory;
+        // Complicated shenanigans to change the signature, if the pointer
+        // is a slice we need a length and if it's a single element pointer
+        // we don't want to take a length
+        usingnamespace switch (size) {
+            .Slice => struct {
+                pub fn init(allocator: std.mem.Allocator, length: usize) !Self {
+                    const slice_size = std.math.mul(
+                        usize,
+                        length,
+                        @sizeOf(T),
+                    ) catch return error.OutOfMemory;
+                    const total_size = std.math.add(
+                        usize,
+                        meta_data_size,
+                        slice_size,
+                    ) catch return error.OutOfMemory;
 
-            const b = try allocator.alignedAlloc(
-                u8,
-                alignment,
-                total_size,
-            );
-            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
+                    const b = try allocator.alignedAlloc(
+                        u8,
+                        alignment,
+                        total_size,
+                    );
+                    std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
 
-            const self: Self = .{
-                .items = bytesAsSliceCast(T, b[meta_data_size..]),
-            };
-            self.refCountPtr().* = 0;
-            if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                self.alignmentPtr().* = alignment;
-            }
+                    const self: Self = .{
+                        .items = bytesAsSliceCast(T, b[meta_data_size..]),
+                    };
+                    self.refCountPtr().* = 0;
+                    if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+                        self.alignmentPtr().* = alignment;
+                    }
 
-            return self;
-        }
+                    return self;
+                }
+            },
+            .One => struct {
+                pub fn init(allocator: std.mem.Allocator) !Self {
+                    const total_size = std.math.add(
+                        usize,
+                        meta_data_size,
+                        @sizeOf(T),
+                    ) catch return error.OutOfMemory;
+
+                    const b = try allocator.alignedAlloc(
+                        u8,
+                        alignment,
+                        total_size,
+                    );
+
+                    const self: Self = .{
+                        .items = std.mem.bytesAsValue(T, b[meta_data_size..]),
+                    };
+                    self.refCountPtr().* = 0;
+                    if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+                        self.alignmentPtr().* = alignment;
+                    }
+
+                    return self;
+                }
+            },
+            else => @compileError("Internal error, expected Slice or One"),
+        };
 
         pub fn releaseDeinitDangling(self: Self, allocator: std.mem.Allocator) void {
             self.release();
@@ -167,23 +200,41 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         fn bytes(self: Self) []align(alignment) u8 {
+            const ptr = switch (size) {
+                .Slice => self.items.ptr,
+                .One => self.items,
+                else => @compileError("Internal error, expected Slice or One"),
+            };
+            const byte_length = switch (size) {
+                .Slice => self.items.len * @sizeOf(T),
+                .One => @sizeOf(T),
+                else => @compileError("Internal error, expected Slice or One"),
+            };
             return @as(
                 [*]align(alignment) u8,
-                @ptrFromInt(@intFromPtr(self.items.ptr) - alignment),
-            )[0 .. meta_data_size + self.items.len * @sizeOf(T)];
+                @ptrFromInt(@intFromPtr(ptr) - alignment),
+            )[0 .. meta_data_size + byte_length];
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
-            const val = @intFromPtr(self.items.ptr) - ref_count_offset;
-            return @ptrFromInt(val);
+            const ptr = switch (size) {
+                .Slice => self.items.ptr,
+                .One => self.items,
+                else => @compileError("Internal error, expected Slice or One"),
+            };
+            return @ptrFromInt(@intFromPtr(ptr) - ref_count_offset);
         }
 
         fn alignmentPtr(self: Self) *u16 {
             if (builtin.mode != .Debug and builtin.mode != .ReleaseSafe) {
                 @compileError("Internal error, alignment is not stored in this optimization mode");
             }
-            const val = @intFromPtr(self.items.ptr) - alignment_offset;
-            return @ptrFromInt(val);
+            const ptr = switch (size) {
+                .Slice => self.items.ptr,
+                .One => self.items,
+                else => @compileError("Internal error, expected Slice or One"),
+            };
+            return @ptrFromInt(@intFromPtr(ptr) - alignment_offset);
         }
 
         fn isIrcType(IrcType: type) void {
@@ -205,7 +256,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             }
 
             const methods = [_][]const u8{
-                "init",
+                // "init", // The usingnamespace shenanigans makes zig not think `init` is a method
                 "deinit",
                 "releaseDeinitDangling",
                 "dangling",
