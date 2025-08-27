@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 pub const IrcConfig = struct {
     Counter: type = usize,
     alignment: ?u16 = null,
+    is_const: bool = false,
 };
 
 pub fn IrcSlice(T: type, cfg: IrcConfig) type {
@@ -75,7 +76,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         const Self = @This();
         const config = cfg;
 
-        items: []align(cfg.alignment orelse @alignOf(T)) T,
+        items: IrcSliceType(T, cfg),
 
         pub fn init(allocator: std.mem.Allocator, size: usize) !Self {
             const slice_size = std.math.mul(
@@ -214,6 +215,21 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             // Type passes sanity checks...
         }
     };
+}
+
+fn IrcSliceType(T: type, config: IrcConfig) type {
+    return @Type(.{
+        .Pointer = .{
+            .size = .Slice,
+            .is_const = config.is_const,
+            .is_volatile = false,
+            .is_allowzero = false,
+            .alignment = config.alignment orelse @alignOf(T),
+            .address_space = .generic,
+            .child = T,
+            .sentinel = null,
+        },
+    });
 }
 
 // This function from `std.mem` must be duplicated because it is
