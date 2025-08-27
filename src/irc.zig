@@ -52,7 +52,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     var rc_offset: usize = undefined;
     var al_offset: usize = undefined;
 
-    if (@sizeOf(cfg.Counter) < @sizeOf(u16) and builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+    if (@sizeOf(cfg.Counter) < @sizeOf(u16) and (builtin.mode == .Debug or builtin.mode == .ReleaseSafe)) {
         rc_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
         al_offset = @sizeOf(u16);
     } else {
