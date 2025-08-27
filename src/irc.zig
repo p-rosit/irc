@@ -239,7 +239,7 @@ const TestType = struct { v1: u8, v2: u8, v3: u8 };
 test "just make type" {
     _ = IrcSlice(u128, .{});
     _ = IrcSlice(TestType, .{});
-    comptime std.debug.assert(@alignOf(TestType) < @sizeOf(TestType));
+    comptime try std.testing.expect(@alignOf(TestType) < @sizeOf(TestType));
 }
 
 test "init and deinit" {
@@ -285,7 +285,7 @@ test "slice size multiplication too big" {
 }
 
 test "slice cannot also fit reference count" {
-    comptime std.debug.assert(@sizeOf(usize) > @sizeOf(u8));
+    comptime try std.testing.expect(@sizeOf(usize) > @sizeOf(u8));
     const err = IrcSlice(u8, .{}).init(std.testing.allocator, std.math.maxInt(usize) - 1);
     try std.testing.expectError(error.OutOfMemory, err);
 }
