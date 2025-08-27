@@ -290,7 +290,7 @@ test "slice cannot also fit reference count" {
     try std.testing.expectError(error.OutOfMemory, err);
 }
 
-test "release and retain" {
+test "release and retain does not alias data" {
     const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 5);
     defer a.deinit(std.testing.allocator);
     @memset(a.items, 0);
@@ -350,6 +350,21 @@ test "release and retain empty" {
     b.release();
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
+}
+
+test "retain release small reference count" {
+    const a = try IrcSlice(u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    try a.retain();
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    try std.testing.expect(!a.dangling());
+
+    a.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
 }
 
 test "retain overflow" {
