@@ -9,6 +9,28 @@ pub const IrcConfig = struct {
     is_allowzero: bool = false,
     address_space: std.builtin.AddressSpace = .generic,
     sentinel: ?*const anyopaque = null,
+
+    const IrcConfigDiff = struct {
+        Counter: ?type = null,
+        alignment: ?u16 = null,
+        is_const: ?bool = null,
+        is_volatile: ?bool = null,
+        is_allowzero: ?bool = null,
+        address_space: ?std.builtin.AddressSpace = null,
+        sentinel: ?*const anyopaque = null,
+    };
+
+    pub fn copyBut(self: IrcConfig, cfg: IrcConfigDiff) IrcConfig {
+        var new_config: IrcConfig = self;
+        if (cfg.Counter) |c| new_config.Counter = c;
+        if (cfg.alignment) |a| new_config.alignment = a;
+        if (cfg.is_const) |c| new_config.is_const = c;
+        if (cfg.is_volatile) |v| new_config.is_volatile = v;
+        if (cfg.is_allowzero) |a| new_config.is_allowzero = a;
+        if (cfg.address_space) |a| new_config.address_space = a;
+        if (cfg.sentinel) |s| new_config.sentinel = s;
+        return new_config;
+    }
 };
 
 pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
@@ -81,7 +103,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 
     return struct {
         const Self = @This();
-        const config = cfg;
+        pub const config = cfg;
 
         items: IrcPointerType(size, T, cfg),
 
@@ -338,6 +360,14 @@ fn bytesAsSliceCast(T: type, bytes_slice: anytype) CopyPtrAttrs(@TypeOf(bytes_sl
 }
 
 const TestType = struct { v1: u8, v2: u8, v3: u8 };
+
+test "copy config but change something" {
+    const cfg: IrcConfig = .{ .is_const = true, .alignment = 32 };
+    try std.testing.expectEqual(
+        IrcConfig{ .is_const = false, .is_volatile = false, .alignment = 32 },
+        cfg.copyBut(.{ .is_const = false, .is_volatile = false }),
+    );
+}
 
 test "just make type" {
     _ = Irc(.Slice, u128, .{});
