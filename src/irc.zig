@@ -196,15 +196,6 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             return .{ .items = @ptrCast(self.items) };
         }
 
-        // This function from `std.mem` has been duplicated since we need
-        // to be able to give it slices of length 0 which still contain
-        // a valid pointer. Currently there's a special case for empty
-        // slices which breaks our code if used
-        fn bytesAsSliceCast(S: type, bytes_slice: anytype) CopyPtrAttrs(@TypeOf(bytes_slice), .Slice, S) {
-            const cast_target = CopyPtrAttrs(@TypeOf(bytes_slice), .Many, S);
-            return @as(cast_target, @ptrCast(bytes_slice))[0..@divExact(bytes_slice.len, @sizeOf(S))];
-        }
-
         fn bytes(self: Self) []align(alignment) u8 {
             const ptr = switch (size) {
                 .Slice => self.items.ptr,
@@ -312,6 +303,15 @@ fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) 
             .sentinel = null,
         },
     });
+}
+
+// This function from `std.mem` has been duplicated since we need
+// to be able to give it slices of length 0 which still contain
+// a valid pointer. Currently there's a special case for empty
+// slices which breaks our code if used
+fn bytesAsSliceCast(T: type, bytes_slice: anytype) CopyPtrAttrs(@TypeOf(bytes_slice), .Slice, T) {
+    const cast_target = CopyPtrAttrs(@TypeOf(bytes_slice), .Many, T);
+    return @as(cast_target, @ptrCast(bytes_slice))[0..@divExact(bytes_slice.len, @sizeOf(T))];
 }
 
 const TestType = struct { v1: u8, v2: u8, v3: u8 };
