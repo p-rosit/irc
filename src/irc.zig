@@ -11,8 +11,11 @@ pub const IrcConfig = struct {
     sentinel: ?*const anyopaque = null,
 };
 
-pub fn IrcSlice(T: type, cfg: IrcConfig) type {
+pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     comptime try std.testing.expectEqual(8, std.mem.byte_size_in_bits);
+    if (size != .One and size != .Slice) {
+        @compileError(std.fmt.comptimePrint("Reference counted pointer size may only be 'One' or 'Slice'", .{size}));
+    }
 
     switch (@typeInfo(cfg.Counter)) {
         .Int => |int| {
@@ -80,12 +83,12 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         const Self = @This();
         const config = cfg;
 
-        items: IrcSliceType(T, cfg),
+        items: IrcPointerType(size, T, cfg),
 
-        pub fn init(allocator: std.mem.Allocator, size: usize) !Self {
+        pub fn init(allocator: std.mem.Allocator, length: usize) !Self {
             const slice_size = std.math.mul(
                 usize,
-                size,
+                length,
                 @sizeOf(T),
             ) catch return error.OutOfMemory;
             const total_size = std.math.add(
@@ -221,10 +224,10 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
     };
 }
 
-fn IrcSliceType(T: type, config: IrcConfig) type {
+fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfig) type {
     return @Type(.{
         .Pointer = .{
-            .size = .Slice,
+            .size = size,
             .is_const = config.is_const,
             .is_volatile = config.is_volatile,
             .is_allowzero = config.is_allowzero,
@@ -257,13 +260,13 @@ fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) 
 const TestType = struct { v1: u8, v2: u8, v3: u8 };
 
 test "just make type" {
-    _ = IrcSlice(u128, .{});
-    _ = IrcSlice(TestType, .{});
+    _ = Irc(.Slice, u128, .{});
+    _ = Irc(.Slice, TestType, .{});
     comptime try std.testing.expect(@alignOf(TestType) < @sizeOf(TestType));
 }
 
 test "make type with bells and whistles" {
-    const T = IrcSlice(u128, .{
+    const T = Irc(.Slice, u128, .{
         .alignment = 32,
         .is_const = true,
         .is_volatile = true,
@@ -280,23 +283,23 @@ test "make type with bells and whistles" {
 }
 
 test "init and deinit" {
-    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 7);
+    const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 7);
     defer a.deinit(std.testing.allocator);
 
-    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 7);
+    const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 7);
     defer b.deinit(std.testing.allocator);
 }
 
 test "init and deinit empty" {
-    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
 
-    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 0);
+    const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 }
 
 test "deinit and maybe release" {
-    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 0);
 
     try a.retain();
     try a.retain();
@@ -306,29 +309,29 @@ test "deinit and maybe release" {
 
 test "allocation failure" {
     var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    const err = IrcSlice(u8, .{}).init(failing_allocator.allocator(), 3);
+    const err = Irc(.Slice, u8, .{}).init(failing_allocator.allocator(), 3);
     try std.testing.expectError(error.OutOfMemory, err);
 }
 
 test "only one allocation" {
     var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 1 });
-    const a = try IrcSlice(u8, .{}).init(failing_allocator.allocator(), 3);
+    const a = try Irc(.Slice, u8, .{}).init(failing_allocator.allocator(), 3);
     a.deinit(std.testing.allocator);
 }
 
 test "slice size multiplication too big" {
-    const err = IrcSlice(struct { v1: u8, v2: u8 }, .{}).init(std.testing.allocator, std.math.maxInt(usize) / 2 + 1);
+    const err = Irc(.Slice, struct { v1: u8, v2: u8 }, .{}).init(std.testing.allocator, std.math.maxInt(usize) / 2 + 1);
     try std.testing.expectError(error.OutOfMemory, err);
 }
 
 test "slice cannot also fit reference count" {
     comptime try std.testing.expect(@sizeOf(usize) > @sizeOf(u8));
-    const err = IrcSlice(u8, .{}).init(std.testing.allocator, std.math.maxInt(usize) - 1);
+    const err = Irc(.Slice, u8, .{}).init(std.testing.allocator, std.math.maxInt(usize) - 1);
     try std.testing.expectError(error.OutOfMemory, err);
 }
 
 test "release and retain does not alias data" {
-    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 5);
+    const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 5);
     defer a.deinit(std.testing.allocator);
     @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
@@ -344,7 +347,7 @@ test "release and retain does not alias data" {
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
-    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 5);
+    const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 5);
     defer b.deinit(std.testing.allocator);
     @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
@@ -362,7 +365,7 @@ test "release and retain does not alias data" {
 }
 
 test "release and retain empty" {
-    const a = try IrcSlice(u128, .{}).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
@@ -375,7 +378,7 @@ test "release and retain empty" {
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
-    const b = try IrcSlice(TestType, .{}).init(std.testing.allocator, 0);
+    const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
@@ -390,7 +393,7 @@ test "release and retain empty" {
 }
 
 test "retain release small reference count" {
-    const a = try IrcSlice(u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
@@ -405,7 +408,7 @@ test "retain release small reference count" {
 }
 
 test "retain overflow" {
-    const a = try IrcSlice(u128, .{ .Counter = usize }).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{ .Counter = usize }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
 
     a.refCountPtr().* = std.math.maxInt(usize);
@@ -413,7 +416,7 @@ test "retain overflow" {
 
     try std.testing.expectError(error.Overflow, a.retain());
 
-    const b = try IrcSlice(u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
+    const b = try Irc(.Slice, u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 
     b.refCountPtr().* = std.math.maxInt(u8);
@@ -423,13 +426,13 @@ test "retain overflow" {
 }
 
 test "alignment" {
-    const a = try IrcSlice(u128, .{ .alignment = 64 }).init(std.testing.allocator, 0);
+    const a = try Irc(.Slice, u128, .{ .alignment = 64 }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
 
     try std.testing.expect(64 != @alignOf(u128));
     try std.testing.expectEqual([]align(64) u128, @TypeOf(a.items));
 
-    const b = try IrcSlice(TestType, .{ .alignment = 32 }).init(std.testing.allocator, 0);
+    const b = try Irc(.Slice, TestType, .{ .alignment = 32 }).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
 
     try std.testing.expect(32 != @alignOf(TestType));
@@ -437,12 +440,12 @@ test "alignment" {
 }
 
 test "cast" {
-    const a = try IrcSlice(u128, .{ .alignment = 64 }).init(std.testing.allocator, 10);
+    const a = try Irc(.Slice, u128, .{ .alignment = 64 }).init(std.testing.allocator, 10);
     defer a.deinit(std.testing.allocator);
     try std.testing.expect(64 != @alignOf(u128));
     try std.testing.expectEqual(0, a.refCountPtr().*);
 
-    const b = a.cast(IrcSlice(u128, .{}));
+    const b = a.cast(Irc(.Slice, u128, .{}));
     try b.retain();
 
     try std.testing.expectEqual(1, a.refCountPtr().*);
