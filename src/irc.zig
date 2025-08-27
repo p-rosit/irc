@@ -121,7 +121,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
         }
 
         fn refCountPtr(self: Self) *cfg.Counter {
-            const val = @intFromPtr(self.items.ptr) - @sizeOf(usize);
+            const val = @intFromPtr(self.items.ptr) - @sizeOf(cfg.Counter);
             return @ptrFromInt(val);
         }
 
