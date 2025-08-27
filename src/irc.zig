@@ -157,7 +157,13 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
             if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                std.debug.assert(alignment == self.alignmentPtr().*);
+                if (alignment != self.alignmentPtr().*) {
+                    @panic(
+                        \\Due to the reference count the pointer must be freed with
+                        \\the same alignment as it was created with. Detected attempt
+                        \\to free pointer with incorrect alignment.
+                    );
+                }
             }
 
             std.debug.assert(self.dangling());
