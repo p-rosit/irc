@@ -112,7 +112,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             return self;
         }
 
-        pub fn releaseDeinit(self: Self, allocator: std.mem.Allocator) void {
+        pub fn releaseDeinitDangling(self: Self, allocator: std.mem.Allocator) void {
             self.release();
             if (self.dangling()) {
                 self.deinit(allocator);
@@ -204,7 +204,7 @@ pub fn IrcSlice(T: type, cfg: IrcConfig) type {
             const methods = [_][]const u8{
                 "init",
                 "deinit",
-                "releaseDeinit",
+                "releaseDeinitDangling",
                 "dangling",
                 "retain",
                 "release",
@@ -300,8 +300,8 @@ test "deinit and maybe release" {
 
     try a.retain();
     try a.retain();
-    a.releaseDeinit(std.testing.allocator);
-    a.releaseDeinit(std.testing.allocator);
+    a.releaseDeinitDangling(std.testing.allocator);
+    a.releaseDeinitDangling(std.testing.allocator);
 }
 
 test "allocation failure" {
