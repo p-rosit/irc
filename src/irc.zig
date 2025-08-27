@@ -14,7 +14,7 @@ pub const IrcConfig = struct {
 pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     comptime try std.testing.expectEqual(8, std.mem.byte_size_in_bits);
     if (size != .One and size != .Slice) {
-        @compileError(std.fmt.comptimePrint("Reference counted pointer size may only be 'One' or 'Slice'", .{size}));
+        @compileError(std.fmt.comptimePrint("Reference counted pointer size may only be 'One' or 'Slice', got: {}", .{size}));
     }
 
     switch (@typeInfo(cfg.Counter)) {
