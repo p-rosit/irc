@@ -107,7 +107,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 
         items: IrcPointerType(size, T, cfg),
 
-        // Complicated shenanigans to change the signature, if the pointer
+        // Complicated shenanigans to change the signature. If the pointer
         // is a slice we need a length and if it's a single element pointer
         // we don't want to take a length
         usingnamespace switch (size) {
