@@ -110,7 +110,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         // Complicated shenanigans to change the signature. If the pointer
         // is a slice we need a length and if it's a single element pointer
         // we don't want to take a length
-        usingnamespace switch (size) {
+        pub usingnamespace switch (size) {
             .Slice => struct {
                 pub fn init(allocator: std.mem.Allocator, length: usize) !Self {
                     const slice_size = std.math.mul(
@@ -299,7 +299,7 @@ pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
     }
 
     const methods = [_][]const u8{
-        // "init", // The usingnamespace shenanigans makes zig not think `init` is a method
+        "init",
         "deinit",
         "releaseDeinitDangling",
         "dangling",
