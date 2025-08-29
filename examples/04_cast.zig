@@ -35,8 +35,8 @@ pub fn main() !void {
     //      @constCast   -> .constCast
     //      @alignCast   -> .alignCast
 
-    // !IMPORTANT!  alignCast will make you unable to free the Irc
-    //              due to the reference count being stored in front
+    // !IMPORTANT!  casting to a lower alignment will make you unable to free
+    //              the Irc due to the reference count being stored in front
     //              of the actual pointer data. An Irc must be `deinit`ed
     //              with the same alignment it was `init`ed, see `05_align_cast.zig`
 }
