@@ -10,10 +10,19 @@ pub fn main() !void {
     // Init a pointer-to-one
     const ptr = try Irc(.One, u128, .{}).init(allocator);
 
+    // Not a compilation error since we have a pointer
+    // that does not point to const
+    ptr.items.* = 0;
+
     // Pointer can be cast, to see options see `IrcConfig`
     const cast_ptr = ptr.cast(Irc(.One, u128, .{ .is_const = true }));
     defer cast_ptr.deinit(allocator);
 
+    // Compilation error since we cannot assign the
+    // pointed value of pointer-to-const
+    // cast_ptr.items.* = 5;
+
+    std.debug.print("Stored value: {}\n", .{cast_ptr.items.*});
     std.debug.print(
         "Original type: {}, Cast type: {}\n",
         .{ @TypeOf(ptr.items), @TypeOf(cast_ptr.items) },
