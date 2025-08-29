@@ -614,6 +614,36 @@ test "one retain release small reference count" {
     try std.testing.expect(a.dangling());
 }
 
+test "slice retain release non power of two reference count" {
+    const a = try Irc(.Slice, u8, .{ .Counter = u9 }).init(std.testing.allocator, 3);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    try a.retain();
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    try std.testing.expect(!a.dangling());
+
+    a.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+}
+
+test "one retain release non power of two reference count" {
+    const a = try Irc(.One, u8, .{ .Counter = u9 }).init(std.testing.allocator);
+    defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+
+    try a.retain();
+    try std.testing.expectEqual(1, a.refCountPtr().*);
+    try std.testing.expect(!a.dangling());
+
+    a.release();
+    try std.testing.expectEqual(0, a.refCountPtr().*);
+    try std.testing.expect(a.dangling());
+}
+
 test "slice retain overflow" {
     const a = try Irc(.Slice, u128, .{ .Counter = usize }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
