@@ -57,9 +57,8 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     }
 
     const alignment = if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) block: {
-        // include alignment of alignment information
         break :block @as(usize, @max(
-            @sizeOf(u16),
+            @sizeOf(u16), // include alignment information
             @alignOf(cfg.Counter),
             cfg.alignment orelse @alignOf(T),
         ));
@@ -75,9 +74,29 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     var al_offset: usize = undefined;
 
     if (@sizeOf(cfg.Counter) < @sizeOf(u16) and (builtin.mode == .Debug or builtin.mode == .ReleaseSafe)) {
+        // counter is smaller than alignment int and Debug/ReleaseSafe is enabled
+        // put the alignment directly behind the pointer and the counter after that
+        //
+        //      _ _ c c a a a a | d d d d | d d d d ...
+        //          |   |         |
+        //          |   |         |_ start of first element
+        //          |   |_ start of alignment data
+        //          |_ start of reference count
+        //
+        // The alignment information is only store in a safe release
         rc_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
         al_offset = @sizeOf(u16);
     } else {
+        // counter is larger than alignment int (or Debug/ReleaseSafe is not enabled)
+        // put the reference count directly behind the pointer and the alignment after that
+        //
+        //      _ _ a a c c c c | d d d d | d d d d ...
+        //          |   |         |
+        //          |   |         |_ start of first element
+        //          |   |_ start of reference count
+        //          |_ start of alignment data
+        //
+        // The alignment information is only store in a safe release
         rc_offset = @sizeOf(cfg.Counter);
         al_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
     }
@@ -129,6 +148,9 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                         alignment,
                         total_size,
                     );
+                    // if the input `length` is zero one past the pointer must
+                    // be valid since we rely on `ptr + meta_data_size` to not
+                    // overflow
                     std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
 
                     const self: Self = .{
