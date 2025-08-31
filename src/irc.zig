@@ -156,10 +156,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                     const self: Self = .{
                         .items = bytesAsSliceCast(T, b[meta_data_size..]),
                     };
-                    self.refCountPtr().* = 0;
-                    if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                        self.alignmentPtr().* = alignment;
-                    }
+                    self.initMetaData();
 
                     return self;
                 }
@@ -181,16 +178,20 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                     const self: Self = .{
                         .items = std.mem.bytesAsValue(T, b[meta_data_size..]),
                     };
-                    self.refCountPtr().* = 0;
-                    if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                        self.alignmentPtr().* = alignment;
-                    }
+                    self.initMetaData();
 
                     return self;
                 }
             },
             else => @compileError("Internal error, expected Slice or One"),
         };
+
+        fn initMetaData(self: Self) void {
+            self.refCountPtr().* = 0;
+            if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+                self.alignmentPtr().* = alignment;
+            }
+        }
 
         pub fn releaseDeinitDangling(self: Self, allocator: std.mem.Allocator) void {
             self.release();
