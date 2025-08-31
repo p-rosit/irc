@@ -440,6 +440,14 @@ test "just make type" {
     comptime try std.testing.expect(@alignOf(TestType) < @sizeOf(TestType));
 }
 
+test "reference count can be atomic" {
+    try std.testing.expect(!Irc(.Slice, u8, .{}).config.atomic);
+    try std.testing.expect(!Irc(.Slice, u8, .{ .atomic = false }).config.atomic);
+    //                     |_ Important exclamation mark
+
+    try std.testing.expect(Irc(.Slice, u8, .{ .atomic = true }).config.atomic);
+}
+
 test "slice make type with bells and whistles" {
     const T = Irc(.Slice, u128, .{
         .alignment = 32,
@@ -490,6 +498,14 @@ test "one init and deinit" {
     defer b.deinit(std.testing.allocator);
 }
 
+test "atomic init and deinit" {
+    const a = try Irc(.Slice, u128, .{ .atomic = true }).init(std.testing.allocator, 7);
+    defer a.deinit(std.testing.allocator);
+
+    const b = try Irc(.One, u128, .{ .atomic = true }).init(std.testing.allocator);
+    defer b.deinit(std.testing.allocator);
+}
+
 test "slice init and deinit empty" {
     const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
@@ -509,6 +525,15 @@ test "slice deinit and maybe release" {
 
 test "one deinit and maybe release" {
     const a = try Irc(.One, u128, .{}).init(std.testing.allocator);
+
+    try a.retain();
+    try a.retain();
+    a.releaseDeinitDangling(std.testing.allocator);
+    a.releaseDeinitDangling(std.testing.allocator);
+}
+
+test "atomic deinit and maybe release" {
+    const a = try Irc(.One, u128, .{ .atomic = true }).init(std.testing.allocator);
 
     try a.retain();
     try a.retain();
@@ -735,6 +760,24 @@ test "one retain overflow" {
     try std.testing.expectError(error.Overflow, a.retain());
 
     const b = try Irc(.One, u128, .{ .Counter = u8 }).init(std.testing.allocator);
+    defer b.deinit(std.testing.allocator);
+
+    b.refCountPtr().* = std.math.maxInt(u8);
+    defer b.refCountPtr().* = 0;
+
+    try std.testing.expectError(error.Overflow, b.retain());
+}
+
+test "atomic retain overflow" {
+    const a = try Irc(.Slice, u128, .{ .Counter = usize, .atomic = true }).init(std.testing.allocator, 4);
+    defer a.deinit(std.testing.allocator);
+
+    a.refCountPtr().* = std.math.maxInt(usize);
+    defer a.refCountPtr().* = 0;
+
+    try std.testing.expectError(error.Overflow, a.retain());
+
+    const b = try Irc(.Slice, u128, .{ .Counter = u8, .atomic = true }).init(std.testing.allocator, 4);
     defer b.deinit(std.testing.allocator);
 
     b.refCountPtr().* = std.math.maxInt(u8);
