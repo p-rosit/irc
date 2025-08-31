@@ -211,7 +211,9 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                 }
             }
 
-            std.debug.assert(self.dangling());
+            if (!self.dangling()) {
+                @panic("Irc is not dangling, cannot free memory that is still in use.");
+            }
             allocator.free(self.bytes());
         }
 
