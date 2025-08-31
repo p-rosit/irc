@@ -245,7 +245,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             };
             if (cfg.Counter != IrcType.config.Counter) {
                 @compileError(std.fmt.comptimePrint(
-                    \\Cannot cast to slice with different reference counter type,
+                    \\Cannot cast to Irc with different reference counter type,
                     \\source counter is {} and target counter is {}
                 ,
                     .{ cfg.Counter, IrcType.config.Counter },
