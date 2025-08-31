@@ -134,7 +134,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         // we don't want to take a length
         pub usingnamespace switch (size) {
             .Slice => struct {
-                pub fn init(allocator: std.mem.Allocator, length: usize) !Self {
+                pub fn init(allocator: std.mem.Allocator, length: usize) error{OutOfMemory}!Self {
                     const slice_size = std.math.mul(
                         usize,
                         length,
@@ -165,7 +165,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                 }
             },
             .One => struct {
-                pub fn init(allocator: std.mem.Allocator) !Self {
+                pub fn init(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
                     const total_size = std.math.add(
                         usize,
                         meta_data_size,
@@ -233,7 +233,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             }
         }
 
-        pub fn retain(self: Self) !void {
+        pub fn retain(self: Self) error{Overflow}!void {
             if (cfg.atomic) {
                 const ref_count = self.refCountPtr();
                 var old_value = @atomicLoad(cfg.Counter, ref_count, .acquire);
