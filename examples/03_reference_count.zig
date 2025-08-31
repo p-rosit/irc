@@ -35,12 +35,14 @@ pub fn main() !void {
     // This releases the pointer and decrements the reference count
     // calling release more times than retain (corresponds to negative
     // reference count) is undefined behaviour
-    ptr.release();
+    ptr.release() catch |err| {
+        std.debug.print("If this prints the reference count hit 0: {}\n", .{err});
+    };
 
     // Now the pointer is dangling again since we `release`d it
     std.debug.print("The pointer is now dangling.        dangling={}\n", .{ptr.dangling()});
 
-    // you might not want to release the pointer if the
+    // you might want to release the pointer if the
     // reference count has hit zero:
     if (ptr.dangling()) {
         ptr.deinit(allocator);

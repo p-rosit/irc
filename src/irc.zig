@@ -202,10 +202,9 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn releaseDeinitDangling(self: Self, allocator: std.mem.Allocator) void {
-            self.release();
-            if (self.dangling()) {
-                self.deinit(allocator);
-            }
+            self.release() catch |err| switch (err) {
+                error.Dangling => self.deinit(allocator),
+            };
         }
 
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
@@ -250,9 +249,10 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             }
         }
 
-        pub fn release(self: Self) void {
+        pub fn release(self: Self) error{Dangling}!void {
+            const ref_count = self.refCountPtr();
+
             if (cfg.atomic) {
-                const ref_count = self.refCountPtr();
                 var old_value = @atomicLoad(cfg.Counter, ref_count, .acquire);
                 while (true) {
                     std.debug.assert(old_value > 0);
@@ -262,9 +262,17 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                         break;
                     }
                 }
+                if (old_value == 1) {
+                    return error.Dangling;
+                }
             } else {
-                std.debug.assert(self.refCountPtr().* > 0);
-                self.refCountPtr().* -= 1;
+                std.debug.assert(ref_count.* > 0);
+                const new_value = ref_count.* - 1;
+                ref_count.* = new_value;
+
+                if (new_value == 0) {
+                    return error.Dangling;
+                }
             }
         }
 
@@ -588,7 +596,7 @@ test "slice release and retain does not alias data" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
@@ -604,7 +612,7 @@ test "slice release and retain does not alias data" {
     try std.testing.expectEqual(1, b.refCountPtr().*);
     try std.testing.expect(!b.dangling());
 
-    b.release();
+    try std.testing.expectError(error.Dangling, b.release());
     @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
@@ -622,7 +630,7 @@ test "one release and retain does not alias data" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     a.items.* = 0;
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
@@ -638,7 +646,7 @@ test "one release and retain does not alias data" {
     try std.testing.expectEqual(1, b.refCountPtr().*);
     try std.testing.expect(!b.dangling());
 
-    b.release();
+    try std.testing.expectError(error.Dangling, b.release());
     b.items.* = .{ .v1 = 0, .v2 = 0, .v3 = 0 };
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
@@ -654,7 +662,7 @@ test "slice release and retain empty" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 
@@ -667,7 +675,7 @@ test "slice release and retain empty" {
     try std.testing.expectEqual(1, b.refCountPtr().*);
     try std.testing.expect(!b.dangling());
 
-    b.release();
+    try std.testing.expectError(error.Dangling, b.release());
     try std.testing.expectEqual(0, b.refCountPtr().*);
     try std.testing.expect(b.dangling());
 }
@@ -682,7 +690,7 @@ test "slice retain release small reference count" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 }
@@ -697,7 +705,7 @@ test "one retain release small reference count" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 }
@@ -712,7 +720,7 @@ test "slice retain release non power of two reference count" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 }
@@ -727,7 +735,7 @@ test "one retain release non power of two reference count" {
     try std.testing.expectEqual(1, a.refCountPtr().*);
     try std.testing.expect(!a.dangling());
 
-    a.release();
+    try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
     try std.testing.expect(a.dangling());
 }
@@ -824,7 +832,7 @@ test "slice cast" {
     try b.retain();
 
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    b.release();
+    try std.testing.expectError(error.Dangling, b.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
 }
 
@@ -838,7 +846,7 @@ test "one cast" {
     try b.retain();
 
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    b.release();
+    try std.testing.expectError(error.Dangling, b.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
 }
 

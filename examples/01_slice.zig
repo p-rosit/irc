@@ -10,7 +10,6 @@ pub fn main() !void {
     // Create a slice of 5 u8-s, notice that the init
     // takes a length argument
     const slice = try Irc(.Slice, u8, .{}).init(allocator, 5);
-    defer slice.deinit(allocator); // This line frees memory
 
     // Retain to increase reference count (0 at start)
     try slice.retain();
@@ -19,6 +18,8 @@ pub fn main() !void {
     @memcpy(slice.items, "12345");
     std.debug.print("This slice contains: {s}\n", .{slice.items});
 
-    // release to decrease reference count (does not free at 0)
-    slice.release();
+    // release to decrease reference count returns `error.Dangling` at 0
+    slice.release() catch {
+        slice.deinit(allocator); // This frees the memory
+    };
 }

@@ -10,7 +10,6 @@ pub fn main() !void {
     // Create a pointer-to-one, notice that the init
     // does __not__ take a length argument
     const ptr = try Irc(.One, u8, .{}).init(allocator);
-    defer ptr.deinit(allocator); // This line frees memory
 
     // Retain to increase reference count (0 at start)
     try ptr.retain();
@@ -19,6 +18,8 @@ pub fn main() !void {
     ptr.items.* = 5;
     std.debug.print("This pointer contains: {}\n", .{ptr.items.*});
 
-    // release to decrease reference count (does not free at 0)
-    ptr.release();
+    // release to decrease reference count returns `error.Dangling` at 0
+    ptr.release() catch {
+        ptr.deinit(allocator); // This frees the memory
+    };
 }

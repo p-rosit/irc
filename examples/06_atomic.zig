@@ -29,5 +29,8 @@ pub fn main() !void {
         .{ Irc(.Slice, u8, .{}).config.atomic, @TypeOf(slice).config.atomic },
     );
 
-    slice.release();
+    slice.release() catch {
+        // The deinit is taken care of right by the allocation in this case
+        // so we don't need to deinit here.
+    };
 }
