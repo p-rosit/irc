@@ -83,7 +83,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         //          |   |_ start of alignment data
         //          |_ start of reference count
         //
-        // The alignment information is only store in a safe release
+        // The alignment information is only stored in a safe release
         rc_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
         al_offset = @sizeOf(u16);
     } else {
@@ -96,7 +96,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         //          |   |_ start of reference count
         //          |_ start of alignment data
         //
-        // The alignment information is only store in a safe release
+        // The alignment information is only stored in a safe release
         rc_offset = @sizeOf(cfg.Counter);
         al_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
     }
