@@ -8,7 +8,8 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Init a pointer-to-one
-    const ptr = try Irc(.One, u128, .{}).init(allocator);
+    const ptr = try Irc(.One, u128, .{ .Counter = u8 }).init(allocator);
+    //                                  |_ The reference count type can be changed
 
     // The reference count cannot be accessed directly.
     // Instead you are only able to ask whether the reference
