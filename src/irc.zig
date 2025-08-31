@@ -9,6 +9,7 @@ pub const IrcConfig = struct {
     is_allowzero: bool = false,
     address_space: std.builtin.AddressSpace = .generic,
     sentinel: ?*const anyopaque = null,
+    atomic: bool = false,
 
     const IrcConfigDiff = struct {
         Counter: ?type = null,
@@ -18,6 +19,7 @@ pub const IrcConfig = struct {
         is_allowzero: ?bool = null,
         address_space: ?std.builtin.AddressSpace = null,
         sentinel: ?*const anyopaque = null,
+        atomic: ?bool = null,
     };
 
     pub fn copyBut(self: IrcConfig, cfg: IrcConfigDiff) IrcConfig {
@@ -29,6 +31,7 @@ pub const IrcConfig = struct {
         if (cfg.is_allowzero) |a| new_config.is_allowzero = a;
         if (cfg.address_space) |a| new_config.address_space = a;
         if (cfg.sentinel) |s| new_config.sentinel = s;
+        if (cfg.atomic) |a| new_config.atomic = a;
         return new_config;
     }
 };
@@ -187,7 +190,12 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         };
 
         fn initMetaData(self: Self) void {
-            self.refCountPtr().* = 0;
+            if (cfg.atomic) {
+                @atomicStore(cfg.Counter, self.refCountPtr(), 0, .release);
+            } else {
+                self.refCountPtr().* = 0;
+            }
+
             if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
                 self.alignmentPtr().* = alignment;
             }
@@ -218,16 +226,46 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         }
 
         pub fn dangling(self: Self) bool {
-            return self.refCountPtr().* == 0;
+            if (cfg.atomic) {
+                return @atomicLoad(cfg.Counter, self.refCountPtr(), .acquire) == 0;
+            } else {
+                return self.refCountPtr().* == 0;
+            }
         }
 
         pub fn retain(self: Self) !void {
-            self.refCountPtr().* = try std.math.add(cfg.Counter, self.refCountPtr().*, 1);
+            if (cfg.atomic) {
+                const ref_count = self.refCountPtr();
+                var old_value = @atomicLoad(cfg.Counter, ref_count, .acquire);
+                while (true) {
+                    const new_value = try std.math.add(cfg.Counter, old_value, 1);
+                    if (@cmpxchgWeak(cfg.Counter, ref_count, old_value, new_value, .acq_rel, .acquire)) |ov| {
+                        old_value = ov;
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                self.refCountPtr().* = try std.math.add(cfg.Counter, self.refCountPtr().*, 1);
+            }
         }
 
         pub fn release(self: Self) void {
-            std.debug.assert(self.refCountPtr().* > 0);
-            self.refCountPtr().* -= 1;
+            if (cfg.atomic) {
+                const ref_count = self.refCountPtr();
+                var old_value = @atomicLoad(cfg.Counter, ref_count, .acquire);
+                while (true) {
+                    std.debug.assert(old_value > 0);
+                    if (@cmpxchgWeak(cfg.Counter, ref_count, old_value, old_value - 1, .acq_rel, .acquire)) |ov| {
+                        old_value = ov;
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                std.debug.assert(self.refCountPtr().* > 0);
+                self.refCountPtr().* -= 1;
+            }
         }
 
         pub fn cast(self: Self, IrcType: type) IrcType {
