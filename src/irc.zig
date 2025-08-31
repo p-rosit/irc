@@ -151,7 +151,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                     // if the input `length` is zero one past the pointer must
                     // be valid since we rely on `ptr + meta_data_size` to not
                     // overflow
-                    std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - alignment);
+                    std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - meta_data_size);
 
                     const self: Self = .{
                         .items = bytesAsSliceCast(T, b[meta_data_size..]),
