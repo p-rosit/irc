@@ -218,18 +218,10 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                 }
             }
 
-            if (!self.dangling()) {
-                @panic("Irc is not dangling, cannot free memory that is still in use.");
+            if (self.refCountPtr().* != 0) {
+                @panic("Irc reference count is not 0, cannot free memory that is still in use.");
             }
             allocator.free(self.bytes());
-        }
-
-        pub fn dangling(self: Self) bool {
-            if (cfg.atomic) {
-                return @atomicLoad(cfg.Counter, self.refCountPtr(), .acquire) == 0;
-            } else {
-                return self.refCountPtr().* == 0;
-            }
         }
 
         pub fn retain(self: Self) error{Overflow}!void {
@@ -373,7 +365,6 @@ pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
         "init",
         "deinit",
         "releaseDeinitDangling",
-        "dangling",
         "retain",
         "release",
         "cast",
@@ -589,33 +580,27 @@ test "slice release and retain does not alias data" {
     defer a.deinit(std.testing.allocator);
     @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     @memset(a.items, 0);
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     @memset(a.items, 0);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 5);
     defer b.deinit(std.testing.allocator);
     @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 
     try b.retain();
     @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(1, b.refCountPtr().*);
-    try std.testing.expect(!b.dangling());
 
     try std.testing.expectError(error.Dangling, b.release());
     @memset(b.items, .{ .v1 = 0, .v2 = 0, .v3 = 0 });
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 }
 
 test "one release and retain does not alias data" {
@@ -623,121 +608,97 @@ test "one release and retain does not alias data" {
     defer a.deinit(std.testing.allocator);
     a.items.* = 0;
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     a.items.* = 0;
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     a.items.* = 0;
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     const b = try Irc(.One, TestType, .{}).init(std.testing.allocator);
     defer b.deinit(std.testing.allocator);
     b.items.* = .{ .v1 = 0, .v2 = 0, .v3 = 0 };
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 
     try b.retain();
     b.items.* = .{ .v1 = 0, .v2 = 0, .v3 = 0 };
     try std.testing.expectEqual(1, b.refCountPtr().*);
-    try std.testing.expect(!b.dangling());
 
     try std.testing.expectError(error.Dangling, b.release());
     b.items.* = .{ .v1 = 0, .v2 = 0, .v3 = 0 };
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 }
 
 test "slice release and retain empty" {
     const a = try Irc(.Slice, u128, .{}).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     const b = try Irc(.Slice, TestType, .{}).init(std.testing.allocator, 0);
     defer b.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 
     try b.retain();
     try std.testing.expectEqual(1, b.refCountPtr().*);
-    try std.testing.expect(!b.dangling());
 
     try std.testing.expectError(error.Dangling, b.release());
     try std.testing.expectEqual(0, b.refCountPtr().*);
-    try std.testing.expect(b.dangling());
 }
 
 test "slice retain release small reference count" {
     const a = try Irc(.Slice, u128, .{ .Counter = u8 }).init(std.testing.allocator, 0);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 }
 
 test "one retain release small reference count" {
     const a = try Irc(.One, u128, .{ .Counter = u8 }).init(std.testing.allocator);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 }
 
 test "slice retain release non power of two reference count" {
     const a = try Irc(.Slice, u8, .{ .Counter = u9 }).init(std.testing.allocator, 3);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 }
 
 test "one retain release non power of two reference count" {
     const a = try Irc(.One, u8, .{ .Counter = u9 }).init(std.testing.allocator);
     defer a.deinit(std.testing.allocator);
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 
     try a.retain();
     try std.testing.expectEqual(1, a.refCountPtr().*);
-    try std.testing.expect(!a.dangling());
 
     try std.testing.expectError(error.Dangling, a.release());
     try std.testing.expectEqual(0, a.refCountPtr().*);
-    try std.testing.expect(a.dangling());
 }
 
 test "slice retain overflow" {

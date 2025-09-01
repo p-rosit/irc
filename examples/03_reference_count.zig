@@ -9,23 +9,13 @@ pub fn main() !void {
 
     // Init a pointer-to-one
     const ptr = try Irc(.One, u128, .{ .Counter = u8 }).init(allocator);
-    //                                  |_ The reference count type can be changed
-
-    // The reference count cannot be accessed directly.
-    // Instead you are only able to ask whether the reference
-    // count is zero or not with `dangling`.
-    //
-    // It will start out with a reference count of zero which
-    // means that this will print `true`
-    std.debug.print("The pointer is dangling after init. dangling={}\n", .{ptr.dangling()});
+    //                                  |_ The reference count type can be changed it
+    //                                     must, however, be an unsigned integer type
 
     // You can add to the reference count by calling `retain`.
     // This could return an error since the reference count could
     // overflow, kind of like an allocator returning `error.OutOfMemory`
     try ptr.retain();
-
-    // Since we called `retain` the pointer is no longer dangling:
-    std.debug.print("The pointer is no longer dangling.  dangling={}\n", .{ptr.dangling()});
 
     // This call would trigger an assert in a Debug or ReleaseSafe build
     // since the reference count is not zero. You should not free a non-dangling
@@ -37,16 +27,8 @@ pub fn main() !void {
     // reference count) is undefined behaviour
     ptr.release() catch |err| {
         std.debug.print("If this prints the reference count hit 0: {}\n", .{err});
-    };
-
-    // Now the pointer is dangling again since we `release`d it
-    std.debug.print("The pointer is now dangling.        dangling={}\n", .{ptr.dangling()});
-
-    // you might want to release the pointer if the
-    // reference count has hit zero:
-    if (ptr.dangling()) {
         ptr.deinit(allocator);
-    }
+    };
 
     // Release and then maybe deinit can be combined into one function call:
     // ptr.releaseDeinitDangling();
