@@ -25,6 +25,7 @@ pub fn main() !void {
         \\
         \\if a type has an atomic counter it cannot be cast away
         \\and vice versa.
+        \\
     ,
         .{ Irc(.Slice, u8, .{}).config.atomic, @TypeOf(slice).config.atomic },
     );
