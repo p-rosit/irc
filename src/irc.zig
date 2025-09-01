@@ -368,6 +368,8 @@ pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
         "retain",
         "release",
         "cast",
+        "alignCast",
+        "constCast",
     };
     comptime for (methods) |method| {
         if (!std.meta.hasFn(IrcType, method)) {
