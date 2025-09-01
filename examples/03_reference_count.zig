@@ -18,9 +18,9 @@ pub fn main() !void {
     // (the returned error is `error.Overflow` though)
     try ptr.retain();
 
-    // This call would trigger an assert in a Debug or ReleaseSafe build
-    // since the reference count is not zero. You should not free a non-dangling
-    // pointer since it is still used somewhere else.
+    // This call triggers a panic since the reference count is not zero.
+    // You should not free a non-dangling pointer since it is still used
+    // somewhere else.
     // ptr.deinit(allocator);
 
     // This releases the pointer and decrements the reference count
