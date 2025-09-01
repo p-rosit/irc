@@ -10,16 +10,17 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/irc.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
-
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_lib_unit_tests.step);
+    inline for (std.meta.fields(std.builtin.OptimizeMode)) |field| {
+        const mode: std.builtin.OptimizeMode = @enumFromInt(field.value);
+        const lib_unit_tests = b.addTest(.{
+            .root_source_file = b.path("src/irc.zig"),
+            .target = target,
+            .optimize = mode,
+        });
+        const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
+        test_step.dependOn(&run_lib_unit_tests.step);
+    }
 
     const example_index = b.option(usize, "example", "Index of the example to run in the 'Run' step, default value is 1.") orelse 1;
 
