@@ -1,4 +1,4 @@
-### IRC - Intrusive Reference Counted pointers
+# IRC - Intrusive Reference Counted pointers
 
 Zig-style reference counted pointers, everything about the pointer can be modified and you can choose whether the reference count is atomic or not in the config:
 
