@@ -15,6 +15,7 @@ pub fn main() !void {
     // You can add to the reference count by calling `retain`.
     // This could return an error since the reference count could
     // overflow, kind of like an allocator returning `error.OutOfMemory`
+    // (the returned error is `error.Overflow` though)
     try ptr.retain();
 
     // This call would trigger an assert in a Debug or ReleaseSafe build
