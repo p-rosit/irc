@@ -1,5 +1,6 @@
 .{
-    .name = "irc",
+    .fingerprint = 0x71f5022be2f02366,
+    .name = .irc,
     .version = "1.0.0",
     .minimum_zig_version = "0.14.0",
     .dependencies = .{

@@ -13,11 +13,12 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     inline for (std.meta.fields(std.builtin.OptimizeMode)) |field| {
         const mode: std.builtin.OptimizeMode = @enumFromInt(field.value);
-        const lib_unit_tests = b.addTest(.{
+        const mod_test = b.createModule(.{
             .root_source_file = b.path("src/irc.zig"),
             .target = target,
             .optimize = mode,
         });
+        const lib_unit_tests = b.addTest(.{ .root_module = mod_test });
         const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
         test_step.dependOn(&run_lib_unit_tests.step);
     }
@@ -35,11 +36,14 @@ pub fn build(b: *std.Build) void {
     while (it.next() catch @panic("Could not read entries in 'examples' directory")) |entry| {
         const index = std.fmt.parseInt(u8, entry.name[0..2], 10) catch continue;
         if (index == example_index) {
-            ex = b.addExecutable(.{
-                .name = entry.name,
+            const example_mod = b.createModule(.{
                 .root_source_file = example_dir.path(b, entry.name),
                 .target = target,
                 .optimize = optimize,
+            });
+            ex = b.addExecutable(.{
+                .name = entry.name,
+                .root_module = example_mod,
             });
             break;
         }
