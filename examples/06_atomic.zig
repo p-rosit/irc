@@ -7,7 +7,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const slice = try Irc(.Slice, u8, .{ .atomic = true }).init(allocator, 5);
+    const slice = try Irc(.slice, u8, .{ .atomic = true }).init(allocator, 5);
     //                                    |_ The reference count is now only ever atomically modified
     defer slice.deinit(allocator);
 
@@ -27,7 +27,7 @@ pub fn main() !void {
         \\and vice versa.
         \\
     ,
-        .{ Irc(.Slice, u8, .{}).config.atomic, @TypeOf(slice).config.atomic },
+        .{ Irc(.slice, u8, .{}).config.atomic, @TypeOf(slice).config.atomic },
     );
 
     slice.release() catch {
@@ -35,3 +35,4 @@ pub fn main() !void {
         // so we don't need to deinit here.
     };
 }
+

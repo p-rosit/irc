@@ -9,7 +9,7 @@ pub fn main() !void {
 
     // Create a slice of 5 u8-s, notice that the init
     // takes a length argument
-    const slice = try Irc(.Slice, u8, .{}).init(allocator, 5);
+    const slice = try Irc(.slice, u8, .{}).init(allocator, 5);
     defer slice.deinit(allocator); // This frees the memory
 
     // Retain to increase reference count (0 at start)

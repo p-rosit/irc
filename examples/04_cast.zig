@@ -8,14 +8,14 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Init a pointer-to-one
-    const ptr = try Irc(.One, u128, .{}).init(allocator);
+    const ptr = try Irc(.one, u128, .{}).init(allocator);
 
     // Not a compilation error since we have a pointer
     // that does not point to const
     ptr.items.* = 0;
 
     // Pointer can be cast, to see options see `IrcConfig`
-    const cast_ptr = ptr.cast(Irc(.One, u128, .{ .is_const = true }));
+    const cast_ptr = ptr.cast(Irc(.one, u128, .{ .is_const = true }));
     defer cast_ptr.deinit(allocator);
 
     // Compilation error since we cannot assign the

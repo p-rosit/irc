@@ -9,7 +9,7 @@ pub fn main() !void {
 
     // Create a pointer-to-one, notice that the init
     // does __not__ take a length argument
-    const ptr = try Irc(.One, u8, .{}).init(allocator);
+    const ptr = try Irc(.one, u8, .{}).init(allocator);
     defer ptr.deinit(allocator); // This frees the memory
 
     // Retain to increase reference count (0 at start)

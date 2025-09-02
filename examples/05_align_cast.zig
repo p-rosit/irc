@@ -30,16 +30,16 @@ pub fn main() !void {
     // Hopefully this makes it clear that the alignment must be known to be
     // able to free the pointer correctly since the only thing that the Irc
     // keeps track of is the start of the elements
-    const ptr = try Irc(.Slice, u128, .{ .alignment = 64 }).init(allocator, 10);
+    const ptr = try Irc(.slice, u128, .{ .alignment = 64 }).init(allocator, 10);
 
     // Cast to lower alignment
-    const cast_ptr = ptr.cast(Irc(.Slice, u128, .{ .alignment = 32 }));
+    const cast_ptr = ptr.cast(Irc(.slice, u128, .{ .alignment = 32 }));
 
     // This would trigger a panic in `Debug` and `ReleaseSafe` the Irc
     // must be freed with the same alignment it was allocated with
     // cast_ptr.deinit(allocator);
 
-    const real_alignment_ptr = cast_ptr.alignCast(Irc(.Slice, u128, .{ .alignment = 64 }));
+    const real_alignment_ptr = cast_ptr.alignCast(Irc(.slice, u128, .{ .alignment = 64 }));
     std.debug.print(
         "Types are:\n\t{}\n\t{}\n\t{}\n",
         .{
