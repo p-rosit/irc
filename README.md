@@ -16,10 +16,10 @@ This creates the following (not atomically) reference counted type `*const []usi
 
 ## Installation
 
-To add version `1.0.0` to your project run
+To add version `1.1.0` to your project run
 
 ```bash
-zig fetch --save git+https://github.com/p-rosit/irc/#1.0.0
+zig fetch --save git+https://github.com/p-rosit/irc/#1.1.0
 ```
 
 Then add the following to your build file:
