@@ -60,23 +60,23 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     }
 
     const alignment = if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) block: {
-        break :block @as(usize, @max(
-            @sizeOf(u16), // include alignment information
+        break :block @max(
+            @sizeOf(std.mem.Alignment), // include alignment information
             @alignOf(cfg.Counter),
             cfg.alignment orelse @alignOf(T),
-        ));
+        );
     } else block: {
         // don't include alignment of alignment information
-        break :block @as(usize, @max(
+        break :block @max(
             @alignOf(cfg.Counter),
             cfg.alignment orelse @alignOf(T),
-        ));
+        );
     };
 
     var rc_offset: usize = undefined;
     var al_offset: usize = undefined;
 
-    if (@sizeOf(cfg.Counter) < @sizeOf(u16) and (builtin.mode == .Debug or builtin.mode == .ReleaseSafe)) {
+    if (@sizeOf(cfg.Counter) < @sizeOf(std.mem.Alignment) and (builtin.mode == .Debug or builtin.mode == .ReleaseSafe)) {
         // counter is smaller than alignment int and Debug/ReleaseSafe is enabled
         // put the alignment directly behind the pointer and the counter after that
         //
@@ -87,8 +87,8 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         //          |_ start of reference count
         //
         // The alignment information is only stored in a safe release
-        rc_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
-        al_offset = @sizeOf(u16);
+        rc_offset = @sizeOf(cfg.Counter) + @sizeOf(std.mem.Alignment);
+        al_offset = @sizeOf(std.mem.Alignment);
     } else {
         // counter is larger than alignment int (or Debug/ReleaseSafe is not enabled)
         // put the reference count directly behind the pointer and the alignment after that
@@ -101,7 +101,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         //
         // The alignment information is only stored in a safe release
         rc_offset = @sizeOf(cfg.Counter);
-        al_offset = @sizeOf(cfg.Counter) + @sizeOf(u16);
+        al_offset = @sizeOf(cfg.Counter) + @sizeOf(std.mem.Alignment);
     }
 
     const ref_count_offset = rc_offset;
@@ -197,7 +197,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             }
 
             if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                self.alignmentPtr().* = alignment;
+                self.alignmentPtr().* = comptime std.mem.Alignment.fromByteUnits(alignment);
             }
         }
 
@@ -209,7 +209,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
             if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
-                if (alignment != self.alignmentPtr().*) {
+                if ((comptime std.mem.Alignment.fromByteUnits(alignment)) != self.alignmentPtr().*) {
                     @panic(
                         \\Due to the reference count the pointer must be freed with
                         \\the same alignment as it was created with. Detected attempt
@@ -329,7 +329,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             return @ptrFromInt(@intFromPtr(ptr) - ref_count_offset);
         }
 
-        fn alignmentPtr(self: Self) *u16 {
+        fn alignmentPtr(self: Self) *std.mem.Alignment {
             if (builtin.mode != .Debug and builtin.mode != .ReleaseSafe) {
                 @compileError("Internal error, alignment is not stored in this optimization mode");
             }
