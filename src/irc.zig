@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 pub const IrcConfig = struct {
     Counter: type = usize,
-    alignment: ?u16 = null,
+    alignment: ?comptime_int = null,
     is_const: bool = false,
     is_volatile: bool = false,
     is_allowzero: bool = false,
@@ -13,7 +13,7 @@ pub const IrcConfig = struct {
 
     const IrcConfigDiff = struct {
         Counter: ?type = null,
-        alignment: ?u16 = null,
+        alignment: ?comptime_int = null,
         is_const: ?bool = null,
         is_volatile: ?bool = null,
         is_allowzero: ?bool = null,
