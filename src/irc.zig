@@ -43,7 +43,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
     }
 
     switch (@typeInfo(cfg.Counter)) {
-        .Int => |int| {
+        .int => |int| {
             if (int.signedness != .unsigned) {
                 @compileError(std.fmt.comptimePrint(
                     "Reference counter type must be unsigned, got {}",
@@ -346,7 +346,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
 pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
     const irc_info = @typeInfo(IrcType);
     switch (irc_info) {
-        .Struct => {},
+        .@"struct" => {},
         else => {
             return "expected a struct";
         },
@@ -354,7 +354,7 @@ pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
 
     var found: bool = false;
     const field_items = "items";
-    comptime for (irc_info.Struct.fields) |field| {
+    comptime for (irc_info.@"struct".fields) |field| {
         found = found or std.mem.eql(u8, field_items, field.name);
     };
     if (!found) {
@@ -383,7 +383,7 @@ pub fn isIrcSanityCheck(IrcType: type) ?[]const u8 {
 
 fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfig) type {
     return @Type(.{
-        .Pointer = .{
+        .pointer = .{
             .size = size,
             .is_const = config.is_const,
             .is_volatile = config.is_volatile,
@@ -399,9 +399,9 @@ fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfi
 // This function from `std.mem` must be duplicated because it is
 // not marked pub. It is however needed to implement `bytesAsSlice`
 fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) type {
-    const info = @typeInfo(source).Pointer;
+    const info = @typeInfo(source).pointer;
     return @Type(.{
-        .Pointer = .{
+        .pointer = .{
             .size = size,
             .is_const = info.is_const,
             .is_volatile = info.is_volatile,
