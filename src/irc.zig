@@ -132,62 +132,65 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
         // Complicated shenanigans to change the signature. If the pointer
         // is a slice we need a length and if it's a single element pointer
         // we don't want to take a length
-        pub usingnamespace switch (size) {
-            .Slice => struct {
-                pub fn init(allocator: std.mem.Allocator, length: usize) error{OutOfMemory}!Self {
-                    const slice_size = std.math.mul(
-                        usize,
-                        length,
-                        @sizeOf(T),
-                    ) catch return error.OutOfMemory;
-                    const total_size = std.math.add(
-                        usize,
-                        meta_data_size,
-                        slice_size,
-                    ) catch return error.OutOfMemory;
-
-                    const b = try allocator.alignedAlloc(
-                        u8,
-                        alignment,
-                        total_size,
-                    );
-                    // if the input `length` is zero one past the pointer must
-                    // be valid since we rely on `ptr + meta_data_size` to not
-                    // overflow
-                    std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - meta_data_size);
-
-                    const self: Self = .{
-                        .items = bytesAsSliceCast(T, b[meta_data_size..]),
-                    };
-                    self.initMetaData();
-
-                    return self;
-                }
-            },
-            .One => struct {
-                pub fn init(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
-                    const total_size = std.math.add(
-                        usize,
-                        meta_data_size,
-                        @sizeOf(T),
-                    ) catch return error.OutOfMemory;
-
-                    const b = try allocator.alignedAlloc(
-                        u8,
-                        alignment,
-                        total_size,
-                    );
-
-                    const self: Self = .{
-                        .items = std.mem.bytesAsValue(T, b[meta_data_size..]),
-                    };
-                    self.initMetaData();
-
-                    return self;
-                }
-            },
+        pub const init = switch (size) {
+            .slice => initSlice,
+            .one => initOne,
             else => @compileError("Internal error, expected Slice or One"),
         };
+
+        fn initSlice(allocator: std.mem.Allocator, length: usize) error{OutOfMemory}!Self {
+            if (size == .one) {
+                @compileError("Internal error, got `.one` but trying to use `.slice` init");
+            }
+            const slice_size = std.math.mul(
+                usize,
+                length,
+                @sizeOf(T),
+            ) catch return error.OutOfMemory;
+            const total_size = std.math.add(
+                usize,
+                meta_data_size,
+                slice_size,
+            ) catch return error.OutOfMemory;
+
+            const b = try allocator.alignedAlloc(
+                u8,
+                comptime std.mem.Alignment.fromByteUnits(alignment),
+                total_size,
+            );
+            // if the input `length` is zero one past the pointer must
+            // be valid since we rely on `ptr + meta_data_size` to not
+            // overflow
+            std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - meta_data_size);
+
+            const self: Self = .{
+                .items = bytesAsSliceCast(T, b[meta_data_size..]),
+            };
+            self.initMetaData();
+
+            return self;
+        }
+
+        fn initOne(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
+            const total_size = std.math.add(
+                usize,
+                meta_data_size,
+                @sizeOf(T),
+            ) catch return error.OutOfMemory;
+
+            const b = try allocator.alignedAlloc(
+                u8,
+                comptime std.mem.Alignment.fromByteUnits(alignment),
+                total_size,
+            );
+
+            const self: Self = .{
+                .items = std.mem.bytesAsValue(T, b[meta_data_size..]),
+            };
+            self.initMetaData();
+
+            return self;
+        }
 
         fn initMetaData(self: Self) void {
             if (cfg.atomic) {
