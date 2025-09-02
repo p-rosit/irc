@@ -8,7 +8,7 @@ pub const IrcConfig = struct {
     is_volatile: bool = false,
     is_allowzero: bool = false,
     address_space: std.builtin.AddressSpace = .generic,
-    sentinel: ?*const anyopaque = null,
+    sentinel_ptr: ?*const anyopaque = null,
     atomic: bool = false,
 
     const IrcConfigDiff = struct {
@@ -18,7 +18,7 @@ pub const IrcConfig = struct {
         is_volatile: ?bool = null,
         is_allowzero: ?bool = null,
         address_space: ?std.builtin.AddressSpace = null,
-        sentinel: ?*const anyopaque = null,
+        sentinel_ptr: ?*const anyopaque = null,
         atomic: ?bool = null,
     };
 
@@ -30,7 +30,7 @@ pub const IrcConfig = struct {
         if (cfg.is_volatile) |v| new_config.is_volatile = v;
         if (cfg.is_allowzero) |a| new_config.is_allowzero = a;
         if (cfg.address_space) |a| new_config.address_space = a;
-        if (cfg.sentinel) |s| new_config.sentinel = s;
+        if (cfg.sentinel_ptr) |s| new_config.sentinel_ptr = s;
         if (cfg.atomic) |a| new_config.atomic = a;
         return new_config;
     }
@@ -391,7 +391,7 @@ fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfi
             .alignment = config.alignment orelse @alignOf(T),
             .address_space = config.address_space,
             .child = T,
-            .sentinel = config.sentinel,
+            .sentinel_ptr = config.sentinel_ptr,
         },
     });
 }
@@ -409,7 +409,7 @@ fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) 
             .alignment = info.alignment,
             .address_space = info.address_space,
             .child = child,
-            .sentinel = null,
+            .sentinel_ptr = null,
         },
     });
 }
@@ -456,7 +456,7 @@ test "slice make type with bells and whistles" {
         .is_volatile = true,
         .is_allowzero = true,
         .address_space = .gs,
-        .sentinel = &@as(u128, 1),
+        .sentinel_ptr = &@as(u128, 1),
     });
     const a: T = undefined;
     try std.testing.expect(32 != @alignOf(u128));
@@ -473,7 +473,7 @@ test "one make type with bells and whistles" {
         .is_volatile = true,
         .is_allowzero = true,
         .address_space = .gs,
-        .sentinel = &@as(u128, 1),
+        .sentinel_ptr = &@as(u128, 1),
     });
     const b: T = undefined;
     try std.testing.expect(32 != @alignOf(u128));
