@@ -164,7 +164,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             std.debug.assert(@intFromPtr(b.ptr) < std.math.maxInt(usize) - meta_data_size);
 
             const self: Self = .{
-                .items = bytesAsSliceCast(T, b[meta_data_size..]),
+                .items = @ptrCast(b[meta_data_size..]),
             };
             self.initMetaData();
 
@@ -399,33 +399,6 @@ fn IrcPointerType(size: std.builtin.Type.Pointer.Size, T: type, config: IrcConfi
     });
 }
 
-// This function from `std.mem` must be duplicated because it is
-// not marked pub. It is however needed to implement `bytesAsSlice`
-fn CopyPtrAttrs(source: type, size: std.builtin.Type.Pointer.Size, child: type) type {
-    const info = @typeInfo(source).pointer;
-    return @Type(.{
-        .pointer = .{
-            .size = size,
-            .is_const = info.is_const,
-            .is_volatile = info.is_volatile,
-            .is_allowzero = info.is_allowzero,
-            .alignment = info.alignment,
-            .address_space = info.address_space,
-            .child = child,
-            .sentinel_ptr = null,
-        },
-    });
-}
-
-// This function from `std.mem` has been duplicated since we need
-// to be able to give it slices of length 0 which still contain
-// a valid pointer. Currently there's a special case for empty
-// slices which breaks our code if used
-fn bytesAsSliceCast(T: type, bytes_slice: anytype) CopyPtrAttrs(@TypeOf(bytes_slice), .slice, T) {
-    const cast_target = CopyPtrAttrs(@TypeOf(bytes_slice), .many, T);
-    return @as(cast_target, @ptrCast(bytes_slice))[0..@divExact(bytes_slice.len, @sizeOf(T))];
-}
-
 const TestType = struct { v1: u8, v2: u8, v3: u8 };
 
 test "copy config but change something" {
@@ -489,9 +462,11 @@ test "one make type with bells and whistles" {
 test "slice init and deinit" {
     const a = try Irc(.slice, u128, .{}).init(std.testing.allocator, 7);
     defer a.deinit(std.testing.allocator);
+    try std.testing.expectEqual(7, a.items.len);
 
     const b = try Irc(.slice, TestType, .{}).init(std.testing.allocator, 7);
     defer b.deinit(std.testing.allocator);
+    try std.testing.expectEqual(7, b.items.len);
 }
 
 test "one init and deinit" {
