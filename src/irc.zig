@@ -152,11 +152,26 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
                 meta_data_size,
                 slice_size,
             ) catch return error.OutOfMemory;
+            return Self.initFromByteLength(allocator, total_size);
+        }
 
+        fn initOne(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
+            if (size == .slice) {
+                @compileError("Internal error, got `.slice` but trying to use `.one` init");
+            }
+            const total_size = std.math.add(
+                usize,
+                meta_data_size,
+                @sizeOf(T),
+            ) catch return error.OutOfMemory;
+            return Self.initFromByteLength(allocator, total_size);
+        }
+
+        fn initFromByteLength(allocator: std.mem.Allocator, byte_size: usize) !Self {
             const b = try allocator.alignedAlloc(
                 u8,
                 comptime std.mem.Alignment.fromByteUnits(alignment),
-                total_size,
+                byte_size,
             );
             // if the input `length` is zero one past the pointer must
             // be valid since we rely on `ptr + meta_data_size` to not
@@ -166,33 +181,7 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             const self: Self = .{
                 .items = @ptrCast(b[meta_data_size..]),
             };
-            self.initMetaData();
 
-            return self;
-        }
-
-        fn initOne(allocator: std.mem.Allocator) error{OutOfMemory}!Self {
-            const total_size = std.math.add(
-                usize,
-                meta_data_size,
-                @sizeOf(T),
-            ) catch return error.OutOfMemory;
-
-            const b = try allocator.alignedAlloc(
-                u8,
-                comptime std.mem.Alignment.fromByteUnits(alignment),
-                total_size,
-            );
-
-            const self: Self = .{
-                .items = std.mem.bytesAsValue(T, b[meta_data_size..]),
-            };
-            self.initMetaData();
-
-            return self;
-        }
-
-        fn initMetaData(self: Self) void {
             if (cfg.atomic) {
                 @atomicStore(cfg.Counter, self.refCountPtr(), 0, .release);
             } else {
@@ -202,6 +191,8 @@ pub fn Irc(size: std.builtin.Type.Pointer.Size, T: type, cfg: IrcConfig) type {
             if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
                 self.alignmentPtr().* = comptime std.mem.Alignment.fromByteUnits(alignment);
             }
+
+            return self;
         }
 
         pub fn releaseDeinitDangling(self: Self, allocator: std.mem.Allocator) void {
